@@ -95,8 +95,10 @@ st.divider()
 st.subheader("🤖 AI 차트 분석 및 추천")
 
 if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container_width=True):
-    with st.spinner("AI가 1시간봉 차트 데이터와 수급을 분석하는 중입니다..."):
+    # st.spinner 대신 실시간 상태창(st.status) 사용
+    with st.status("🤖 AI 분석을 진행하고 있습니다...", expanded=True) as status:
         try:
+            status.write("📊 1. OKX 거래소에서 1시간봉 차트 데이터를 불러오는 중...")
             ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=15)
             
             market_data = {
@@ -128,29 +130,38 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             }}
             """
 
-            # 503 UNAVAILABLE (서버 트래픽 과부하) 발생 시 자동 재시도 로직 (최대 3회)
+            status.write("🧠 2. Gemini AI 모델에 차트 분석 요청 중...")
+            
             max_retries = 3
             response = None
 
             for attempt in range(max_retries):
                 try:
+                    if attempt > 0:
+                        status.write(f"🔄 AI 서버 응답 지연으로 재시도 중... ({attempt + 1}/{max_retries}회)")
+                    
                     response = ai_client.models.generate_content(
                         model='gemini-3.8-flash',
                         contents=prompt
                     )
                     break  # 성공 시 루프 탈출
                 except Exception as e:
-                    if "503" in str(e) or "UNAVAILABLE" in str(e):
-                        if attempt < max_retries - 1:
-                            time.sleep(2)  # 2초 대기 후 재시도
-                            continue
-                    raise e  # 기타 에러 또는 최대 재시도 횟수 초과 시 예외 전달
+                    if ("503" in str(e) or "UNAVAILABLE" in str(e)) and attempt < max_retries - 1:
+                        time.sleep(2)  # 2초 대기 후 재시도
+                        continue
+                    raise e  # 재시도 횟수 초과 또는 기타 오류 발생 시 전달
 
+            status.write("📥 3. AI 응답 처리 및 판단 결과 정리 중...")
             raw_text = response.text.replace("```json", "").replace("```", "").strip()
             st.session_state.ai_result = json.loads(raw_text)
 
+            # 성공 상태 표시 완료
+            status.update(label="✅ AI 차트 분석 완료!", state="complete", expanded=False)
+
         except Exception as e:
-            st.error(f"AI 분석 요청 중 오류가 발생했습니다: {e}")
+            # 오류 발생 시 상태창 실패 전환
+            status.update(label="❌ AI 분석 요청 중 오류 발생", state="error", expanded=True)
+            st.error(f"오류 상세 내용: {e}")
 
 # AI 분석 결과 출력
 if st.session_state.ai_result:
