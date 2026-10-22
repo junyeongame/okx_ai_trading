@@ -12,14 +12,14 @@ import streamlit as st
 from dotenv import load_dotenv
 from google import genai
 
-# 1. 페이지 기본 설정 및 환경 변수 로드
+# 1. 페이지 기본 설정 및 환경 변수 로드 (사이드바 기본 닫힘)
 load_dotenv()
 
 st.set_page_config(
     page_title="OKX AI Pro Trading",
     page_icon="📈",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # 🔒 세션 상태 초기화
@@ -35,17 +35,6 @@ if "ai_result" not in st.session_state:
 if "limit_price_val" not in st.session_state:
     st.session_state.limit_price_val = 0.0
 
-# --- 테마 설정 (사이드바) ---
-with st.sidebar:
-    st.title("⚙️ 설정 (Settings)")
-    st.session_state.theme_mode = st.radio(
-        "🎨 화면 테마 선택",
-        ["Dark (다크 모드)", "Light (밝은 모드)"],
-        index=0 if "Dark" in st.session_state.theme_mode else 1
-    )
-    st.divider()
-    st.caption("OKX AI Trading Bot v2.9")
-
 # 동적 CSS 스타일 정의
 is_dark = "Dark" in st.session_state.theme_mode
 
@@ -57,18 +46,31 @@ border_color = "#2b313a" if is_dark else "#e5e7eb"
 
 st.markdown(f"""
 <style>
-    /* 전체 메인 배경 및 텍스트 기본 스타일 */
+    /* 1. 사이드바 완전히 숨기기 */
+    [data-testid="stSidebar"] {{
+        display: none !important;
+    }}
+    
+    /* 2. 전체 메인 배경 및 텍스트 기본 스타일 */
     .stApp, div[data-testid="stHeader"], div[data-testid="stToolbar"] {{
         background-color: {bg_color} !important;
         color: {text_color} !important;
     }}
 
-    /* 라벨, 타이틀, 텍스트 색상 다크 테마 강제 연동 */
+    /* 3. 컬럼 및 수평 블록 간격 초밀착 (gap 최소화) */
+    div[data-testid="stHorizontalBlock"] {{
+        gap: 3px !important;
+    }}
+    div[data-testid="column"] {{
+        padding: 0px 1px !important;
+    }}
+
+    /* 4. 라벨, 타이틀, 텍스트 색상 다크 테마 적용 */
     label, p, span, h1, h2, h3, h4, h5, h6, div[data-testid="stWidgetLabel"] {{
         color: {text_color} !important;
     }}
 
-    /* 모든 입력창(지정가, 레버리지 등) 어두운 배경 및 흰색 글씨 적용 */
+    /* 5. 모든 입력창(지정가, 레버리지 등) 어두운 배경 및 흰색 글씨 */
     div[data-baseweb="input"], 
     div[data-baseweb="input"] > div,
     div[data-baseweb="base-input"],
@@ -83,22 +85,21 @@ st.markdown(f"""
         background-color: {input_bg} !important;
     }}
     
-    /* 숫자 조절 (+, -) 버튼 배경 다크 적용 */
     button[aria-label="Decrease value"], button[aria-label="Increase value"] {{
         background-color: {input_bg} !important;
         color: {text_color} !important;
         border-color: {border_color} !important;
     }}
 
-    /* 일반 Streamlit 버튼 슬림화 및 다크 색상 전환 */
+    /* 6. 타임프레임 슬림 버튼 커스텀 */
     div.stButton > button {{
         background-color: {card_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
-        border-radius: 4px !important;
-        padding: 2px 6px !important;
-        min-height: 24px !important;
-        height: 24px !important;
+        border-radius: 3px !important;
+        padding: 0px 4px !important;
+        min-height: 22px !important;
+        height: 22px !important;
         font-size: 11px !important;
         line-height: 20px !important;
     }}
@@ -107,15 +108,22 @@ st.markdown(f"""
         color: #f0b90b !important;
     }}
 
-    /* 타임프레임 상단 슬림 바 지정 */
+    /* 7. '더보기' 및 팝오버(Popover) 다크 모드 완전 적용 (밝은 색 제거) */
+    button[data-testid="stBaseButton-popover"],
     div[data-testid="stPopover"] > button {{
-        background-color: {card_bg} !important;
+        background-color: {input_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
-        min-height: 24px !important;
-        height: 24px !important;
+        min-height: 22px !important;
+        height: 22px !important;
         font-size: 11px !important;
-        padding: 2px 6px !important;
+        padding: 0px 6px !important;
+        border-radius: 3px !important;
+    }}
+    button[data-testid="stBaseButton-popover"]:hover,
+    div[data-testid="stPopover"] > button:hover {{
+        border-color: #f0b90b !important;
+        color: #f0b90b !important;
     }}
     div[data-testid="stPopoverBody"], div[data-baseweb="popover"] {{
         background-color: {card_bg} !important;
@@ -123,20 +131,24 @@ st.markdown(f"""
         border: 1px solid {border_color} !important;
     }}
 
-    /* 💡 호가창 초슬림 다크 스타일 (한눈에 들어오게 축소) */
+    /* 8. 💡 호가창(Order Book) 전용 초밀착 다크 디자인 */
+    div[data-testid="stVerticalBlock"] > div {{
+        gap: 1px !important;
+    }}
+
     div.ob-ask-btn > button {{
         background-color: #1f1418 !important;
         color: #ff4d4f !important;
-        border: 1px solid rgba(255, 77, 79, 0.3) !important;
+        border: 1px solid rgba(255, 77, 79, 0.25) !important;
         font-size: 11px !important;
         font-weight: 600 !important;
-        padding: 0px 4px !important;
-        min-height: 20px !important;
-        height: 20px !important;
-        line-height: 18px !important;
+        padding: 0px 2px !important;
+        min-height: 19px !important;
+        height: 19px !important;
+        line-height: 17px !important;
         margin: 0px !important;
         width: 100% !important;
-        border-radius: 3px !important;
+        border-radius: 2px !important;
     }}
     div.ob-ask-btn > button:hover {{
         background-color: rgba(255, 77, 79, 0.3) !important;
@@ -145,16 +157,16 @@ st.markdown(f"""
     div.ob-bid-btn > button {{
         background-color: #10231b !important;
         color: #00c076 !important;
-        border: 1px solid rgba(0, 192, 118, 0.3) !important;
+        border: 1px solid rgba(0, 192, 118, 0.25) !important;
         font-size: 11px !important;
         font-weight: 600 !important;
-        padding: 0px 4px !important;
-        min-height: 20px !important;
-        height: 20px !important;
-        line-height: 18px !important;
+        padding: 0px 2px !important;
+        min-height: 19px !important;
+        height: 19px !important;
+        line-height: 17px !important;
         margin: 0px !important;
         width: 100% !important;
-        border-radius: 3px !important;
+        border-radius: 2px !important;
     }}
     div.ob-bid-btn > button:hover {{
         background-color: rgba(0, 192, 118, 0.3) !important;
@@ -164,11 +176,11 @@ st.markdown(f"""
     .ob-qty-text {{
         text-align: right;
         font-size: 11px;
-        line-height: 20px;
+        line-height: 19px;
         font-family: monospace;
     }}
 
-    /* 탭 헤더 다크 스타일 적용 */
+    /* 9. 탭 헤더 다크 스타일 적용 */
     button[data-baseweb="tab"] {{
         color: #848e9c !important;
         background-color: transparent !important;
@@ -181,10 +193,10 @@ st.markdown(f"""
     /* OKX Header Bar */
     .okx-header {{
         background-color: {card_bg};
-        padding: 8px 16px;
+        padding: 6px 14px;
         border-radius: 6px;
         border: 1px solid {border_color};
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }}
     .okx-price-up {{ color: #00c076; font-weight: bold; }}
     .okx-price-down {{ color: #ff4d4f; font-weight: bold; }}
@@ -257,7 +269,6 @@ try:
     btc_balance = balance['total'].get('BTC', 0)
     total_asset_usdt = usdt_balance + (btc_balance * current_price)
 
-    # 지정가 기본값 초기화
     if st.session_state.limit_price_val == 0.0:
         st.session_state.limit_price_val = current_price
 
@@ -265,32 +276,49 @@ except Exception as e:
     st.error(f"거래소 데이터 로드 실패: {e}")
     st.stop()
 
-# --- 1. Top Header Bar ---
+# --- 1. Top Header Bar & 내장 설정 창 (사이드바 대신 사이트 내부 상단 배치) ---
 change_class = "okx-price-up" if change_24h >= 0 else "okx-price-down"
 change_sign = "+" if change_24h >= 0 else ""
 
-st.markdown(f"""
-<div class="okx-header">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 16px; font-weight: bold;">⬛ {display_symbol}</span>
-            <span style="background-color: #2b313a; color: #f0b90b; font-size: 10px; padding: 1px 5px; border-radius: 3px;">Demo Trading</span>
-            <span style="background-color: #1e232a; color: #848e9c; font-size: 10px; padding: 1px 5px; border-radius: 3px;">Perp</span>
-        </div>
-        <div style="display: flex; gap: 16px; font-size: 12px;">
-            <div><span style="color: #848e9c;">최근가</span><br><span class="{change_class}" style="font-size: 14px;">${current_price:,.2f}</span></div>
-            <div><span style="color: #848e9c;">24h 변동률</span><br><span class="{change_class}">{change_sign}{change_24h:.2f}%</span></div>
-            <div><span style="color: #848e9c;">24h 고가</span><br><span>${high_24h:,.2f}</span></div>
-            <div><span style="color: #848e9c;">24h 저가</span><br><span>${low_24h:,.2f}</span></div>
-            <div><span style="color: #848e9c;">24h 거래량</span><br><span>{volume_24h:,.2f} BTC</span></div>
-            <div><span style="color: #848e9c;">총 평가 자산</span><br><span style="color: #f0b90b; font-weight: bold;">${total_asset_usdt:,.2f} USDT</span></div>
+header_col, settings_col = st.columns([9.2, 0.8])
+
+with header_col:
+    st.markdown(f"""
+    <div class="okx-header">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 15px; font-weight: bold;">⬛ {display_symbol}</span>
+                <span style="background-color: #2b313a; color: #f0b90b; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Demo Trading</span>
+                <span style="background-color: #1e232a; color: #848e9c; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Perp</span>
+            </div>
+            <div style="display: flex; gap: 14px; font-size: 11px;">
+                <div><span style="color: #848e9c;">최근가</span><br><span class="{change_class}" style="font-size: 13px;">${current_price:,.2f}</span></div>
+                <div><span style="color: #848e9c;">24h 변동률</span><br><span class="{change_class}">{change_sign}{change_24h:.2f}%</span></div>
+                <div><span style="color: #848e9c;">24h 고가</span><br><span>${high_24h:,.2f}</span></div>
+                <div><span style="color: #848e9c;">24h 저가</span><br><span>${low_24h:,.2f}</span></div>
+                <div><span style="color: #848e9c;">24h 거래량</span><br><span>{volume_24h:,.2f} BTC</span></div>
+                <div><span style="color: #848e9c;">총 평가 자산</span><br><span style="color: #f0b90b; font-weight: bold;">${total_asset_usdt:,.2f} USDT</span></div>
+            </div>
         </div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+with settings_col:
+    # ⚙️ 설정 메뉴를 사이트 내부 팝오버로 내장
+    with st.popover("⚙️ 설정", use_container_width=True):
+        st.markdown("<div style='font-size: 12px; font-weight: bold; margin-bottom: 6px;'>🎨 화면 테마 선택</div>", unsafe_allow_html=True)
+        new_theme = st.radio(
+            "테마 선택",
+            ["Dark (다크 모드)", "Light (밝은 모드)"],
+            index=0 if "Dark" in st.session_state.theme_mode else 1,
+            label_visibility="collapsed"
+        )
+        if new_theme != st.session_state.theme_mode:
+            st.session_state.theme_mode = new_theme
+            st.rerun()
 
 # --- 2. 상단 슬림 타임프레임 컨트롤 바 ---
-tf_cols = st.columns([1, 1, 1, 1, 1, 1, 1, 2, 4])
+tf_cols = st.columns([0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 1.2, 5])
 
 def set_timeframe(tf_code):
     st.session_state.active_tf = tf_code
@@ -306,6 +334,7 @@ for idx, (label, code) in enumerate(primary_tfs):
             st.rerun()
 
 with tf_cols[7]:
+    # 다크 스타일이 적용된 더보기 버튼
     with st.popover("⌵ 더보기", use_container_width=True):
         st.markdown("<div style='font-size:11px; margin-bottom:6px;'><b>⏱️ Intervals 선택</b></div>", unsafe_allow_html=True)
         
@@ -356,7 +385,7 @@ with tf_cols[7]:
             if st.button("3M", key="pop_3M"): set_timeframe("3M"); st.rerun()
 
 # --- 3. 메인 3컬럼 레이아웃 (차트 | 호가창 | 주문 패널) ---
-chart_col, orderbook_col, trade_col = st.columns([5.5, 2.2, 2.3])
+chart_col, orderbook_col, trade_col = st.columns([5.6, 2.1, 2.3])
 
 # --- [LEFT: OKX 차트 패널] ---
 with chart_col:
@@ -428,7 +457,7 @@ with chart_col:
 
     st.plotly_chart(fig, use_container_width=True)
 
-# --- [MIDDLE: 실시간 초슬림 호가창 (Order Book)] ---
+# --- [MIDDLE: 초밀착 호가창 (Order Book)] ---
 with orderbook_col:
     st.markdown("<div style='font-weight: bold; font-size: 12px; margin-bottom: 2px;'>📖 Order Book</div>", unsafe_allow_html=True)
 
@@ -450,7 +479,7 @@ with orderbook_col:
 
     st.markdown("<div style='font-size: 10px; color: #848e9c; display:flex; justify-content: space-between; margin-bottom: 2px;'><span>Price(USDT)</span><span>Amount(BTC)</span></div>", unsafe_allow_html=True)
     
-    # 매도 호가 (Asks - 5개)
+    # 💡 세로 간격을 완전 밀착시킨 호가창 출력
     for price, amount in reversed(asks):
         c1, c2 = st.columns([3, 2])
         with c1:
@@ -462,10 +491,9 @@ with orderbook_col:
         with c2:
             st.markdown(f"<div class='ob-qty-text' style='color:#ff4d4f;'>{amount:.4f}</div>", unsafe_allow_html=True)
     
-    # 현재가 중심선
-    st.markdown(f"<div style='text-align:center; padding: 2px 0; font-size: 12px; font-weight:bold; background-color:{card_bg}; border-radius:4px; margin: 2px 0;' class='{change_class}'>${current_price:,.2f} ⚡</div>", unsafe_allow_html=True)
+    # 현재가 중심 라인
+    st.markdown(f"<div style='text-align:center; padding: 1px 0; font-size: 12px; font-weight:bold; background-color:{card_bg}; border-radius:3px; margin: 1px 0;' class='{change_class}'>${current_price:,.2f} ⚡</div>", unsafe_allow_html=True)
     
-    # 매수 호가 (Bids - 5개)
     for price, amount in bids:
         c1, c2 = st.columns([3, 2])
         with c1:
