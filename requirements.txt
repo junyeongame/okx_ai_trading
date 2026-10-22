@@ -1,0 +1,4 @@
+ccxt
+streamlit
+google-genai
+python-dotenv
