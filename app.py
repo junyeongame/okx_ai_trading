@@ -130,7 +130,80 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             """
 
             # 현재 정상 작동하는 최신 Gemini 모델 목록으로 수정
-            candidate_models = ['gemini-3.8-flash','gemini-3.6-Flash','gemini-3.5-Flash-Lite','gemini 2.5-Flash', 'gemini-2.5-Flash-Lite','gemini-3-Flash']
+            # --- 2. AI 차트 분석 및 판단 섹션 ---
+st.subheader("🤖 AI 차트 분석 및 추천")
+
+if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container_width=True):
+    with st.status("🤖 AI 분석을 진행하고 있습니다...", expanded=True) as status:
+        try:
+            status.write("📊 1. OKX 거래소에서 1시간봉 차트 데이터를 불러오는 중...")
+            ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=15)
+            
+            market_data = {
+                "symbol": symbol,
+                "current_price": current_price,
+                "usdt_balance": usdt_balance,
+                "btc_balance": btc_balance,
+                "recent_1h_candles": [
+                    {"open": c[1], "high": c[2], "low": c[3], "close": c[4], "volume": c[5]}
+                    for c in ohlcv
+                ]
+            }
+
+            prompt = f"""
+            당신은 신중하고 전문적인 암호화폐 트레이더입니다.
+            아래 전달된 실시간 시장 데이터와 잔고 상태를 분석하여 매매 전략을 결정하세요.
+
+            [시장 데이터]
+            {json.dumps(market_data, indent=2)}
+
+            [분석 규칙]
+            1. 추세와 거래량을 고려하여 확실한 매수 타점일 때만 "buy", 매도 타점일 때 "sell", 불확실하면 "hold"를 선택하세요.
+            2. 응답은 오직 아래 JSON 양식으로만 응답해야 합니다.
+
+            {{
+                "decision": "buy" 또는 "sell" 또는 "hold",
+                "reason": "기술적 분석에 기반한 구체적인 판단 이유",
+                "percentage": 10~100 사이의 권장 주문 비중 (hold인 경우 0)
+            }}
+            """
+
+            # 올바른 구글 API 소문자 모델명 목록
+            candidate_models = [
+                'gemini-2.5-flash',       # 2.5 Flash (무료 한도 별도 제공)
+                'gemini-2.5-flash-lite',  # 2.5 Flash Lite
+                'gemini-1.5-flash',       # 1.5 Flash
+                'gemini-3.8-flash'        # 3.8 Flash
+            ]
+            
+            response = None
+            success = False
+
+            for model_name in candidate_models:
+                status.write(f"🧠 AI 모델({model_name})에 분석 요청 중...")
+                try:
+                    response = ai_client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                    success = True
+                    break  # 성공 시 재시도 루프 탈출
+                except Exception as e:
+                    status.write(f"⚠️ {model_name} 연결 거부/한도 초과. 다음 모델로 전환합니다.")
+                    continue
+
+            if not success or not response:
+                raise Exception("모든 무료 모델의 하루 이용 한도가 소진되었거나 서버 접속이 원활하지 않습니다.")
+
+            status.write("📥 2. AI 분석 결과 정리 중...")
+            raw_text = response.text.replace("```json", "").replace("```", "").strip()
+            st.session_state.ai_result = json.loads(raw_text)
+
+            status.update(label="✅ AI 차트 분석 완료!", state="complete", expanded=False)
+
+        except Exception as e:
+            status.update(label="❌ AI 분석 실패", state="error", expanded=True)
+            st.error(f"오류 상세 내용: {e}")
             response = None
             success = False
 
