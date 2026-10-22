@@ -95,7 +95,6 @@ st.divider()
 st.subheader("🤖 AI 차트 분석 및 추천")
 
 if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container_width=True):
-    # st.spinner 대신 실시간 상태창(st.status) 사용
     with st.status("🤖 AI 분석을 진행하고 있습니다...", expanded=True) as status:
         try:
             status.write("📊 1. OKX 거래소에서 1시간봉 차트 데이터를 불러오는 중...")
@@ -130,38 +129,50 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             }}
             """
 
-            status.write("🧠 2. Gemini AI 모델에 차트 분석 요청 중...")
-            
-            max_retries = 3
+            # 503 과부하 대비: 메인 모델 실패 시 우회할 대체 모델 순서
+            candidate_models = ['gemini-3.8-flash', 'gemini-2.5-flash']
             response = None
+            success = False
 
-            for attempt in range(max_retries):
-                try:
-                    if attempt > 0:
-                        status.write(f"🔄 AI 서버 응답 지연으로 재시도 중... ({attempt + 1}/{max_retries}회)")
-                    
-                    response = ai_client.models.generate_content(
-                        model='gemini-3.8-flash',
-                        contents=prompt
-                    )
-                    break  # 성공 시 루프 탈출
-                except Exception as e:
-                    if ("503" in str(e) or "UNAVAILABLE" in str(e)) and attempt < max_retries - 1:
-                        time.sleep(2)  # 2초 대기 후 재시도
-                        continue
-                    raise e  # 재시도 횟수 초과 또는 기타 오류 발생 시 전달
+            for model_name in candidate_models:
+                status.write(f"🧠 AI 모델({model_name})에 분석 요청 중...")
+                
+                # 모델당 최대 2회 시도
+                for attempt in range(2):
+                    try:
+                        response = ai_client.models.generate_content(
+                            model=model_name,
+                            contents=prompt
+                        )
+                        success = True
+                        break  # 성공 시 재시도 루프 탈출
+                    except Exception as e:
+                        err_msg = str(e)
+                        if "503" in err_msg or "UNAVAILABLE" in err_msg:
+                            if attempt == 0:
+                                wait_sec = 2
+                                status.write(f"⏳ {model_name} 과부하 발생. {wait_sec}초 후 재시도합니다...")
+                                time.sleep(wait_sec)
+                                continue
+                        # 503 이외 오류이거나 재시도 실패 시 해당 모델 포기
+                        status.write(f"⚠️ {model_name} 응답 지연. 대체 모델로 전환합니다.")
+                        break
 
-            status.write("📥 3. AI 응답 처리 및 판단 결과 정리 중...")
+                if success:
+                    break  # 성공했으면 모델 전환 루프 종료
+
+            if not success or not response:
+                raise Exception("모든 AI 모델 서버가 현재 트래픽 폭주 상태입니다. 잠시 후 다시 시도해 주세요.")
+
+            status.write("📥 2. AI 분석 결과 정돈 중...")
             raw_text = response.text.replace("```json", "").replace("```", "").strip()
             st.session_state.ai_result = json.loads(raw_text)
 
-            # 성공 상태 표시 완료
             status.update(label="✅ AI 차트 분석 완료!", state="complete", expanded=False)
 
         except Exception as e:
-            # 오류 발생 시 상태창 실패 전환
-            status.update(label="❌ AI 분석 요청 중 오류 발생", state="error", expanded=True)
-            st.error(f"오류 상세 내용: {e}")
+            status.update(label="❌ AI 분석 실패", state="error", expanded=True)
+            st.error(f"오류 내용: {e}")
 
 # AI 분석 결과 출력
 if st.session_state.ai_result:
