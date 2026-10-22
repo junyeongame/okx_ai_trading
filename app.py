@@ -5,8 +5,9 @@ import re
 import datetime
 import requests
 import ccxt
+import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
-import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from google import genai
 
@@ -70,14 +71,13 @@ except Exception as e:
 
 openrouter_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", "")
 
-st.title("📈 OKX AI 트레이딩 대시보드")
-st.caption("실시간 차트와 주문 히스토리를 확인하고 AI 판단에 따라 매매를 승인하세요.")
+st.title("📈 OKX AI 트레이딩 대시보드 (레버리지 & 차트 라인 연동)")
+st.caption("레버리지 설정, 차트 진입가/익절가/청산가 실선 표시 및 AI 판단 매매 지원")
 
-# 거래소 심볼 정의 (표시용: BTCUSDT, CCXT용: BTC/USDT)
 display_symbol = 'BTCUSDT'
 ccxt_symbol = 'BTC/USDT'
 
-# 시세 및 잔고 조회
+# --- 1. 실시간 시세 & 계좌 정보 & 레버리지 설정 ---
 try:
     ticker = exchange.fetch_ticker(ccxt_symbol)
     balance = exchange.fetch_balance()
@@ -98,60 +98,134 @@ except Exception as e:
 
 st.divider()
 
-# --- 1. 실시간 트레이딩뷰 차트 섹션 ---
-st.subheader("📊 실시간 OKX BTCUSDT 차트")
+# --- 2. 레버리지 설정 및 포지션 분석 ---
+st.subheader("⚙️ 레버리지 설정 및 포지션 가격선 계산")
 
-tradingview_html = """
-<div class="tradingview-widget-container" style="height:500px;width:100%;">
-  <div id="tradingview_chart" style="height:calc(100% - 32px);width:100%;"></div>
-  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-  <script type="text/javascript">
-  new TradingView.widget(
-  {
-  "autosize": true,
-  "symbol": "OKX:BTCUSDT",
-  "interval": "60",
-  "timezone": "Asia/Seoul",
-  "theme": "dark",
-  "style": "1",
-  "locale": "kr",
-  "toolbar_bg": "#f1f3f6",
-  "enable_publishing": false,
-  "hide_legend": false,
-  "save_image": false,
-  "container_id": "tradingview_chart"
-}
-  );
-  </script>
-</div>
-"""
-components.html(tradingview_html, height=520)
+lev_col1, lev_col2 = st.columns([2, 1])
+
+with lev_col1:
+    leverage = st.slider("🎯 레버리지 배율 선택 (1x ~ 50x)", min_value=1, max_value=50, value=5, step=1)
+
+with lev_col2:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("⚡ OKX 거래소에 레버리지 적용", use_container_width=True):
+        try:
+            exchange.set_leverage(int(leverage), ccxt_symbol, params={'mgnMode': 'isolated'})
+            st.success(f"✅ OKX 거래소에 레버리지 {leverage}x 설정이 완료되었습니다!")
+        except Exception as le:
+            st.info(f"💡 현물/심플 모드 계좌 안내: 레버리지 {leverage}x 기준 가격선이 차트에 계산되어 표시됩니다. ({le})")
+
+# 보유 포지션 진입가 및 청산가/최소익절가 계산
+entry_price = 0.0
+liq_price = 0.0
+min_tp_price = 0.0
+
+try:
+    # 최근 체결 내역 기반 진입가 추정 또는 보유 BTC가 있을 때 계산
+    if btc_balance > 0.0001:
+        closed_orders = exchange.fetch_closed_orders(ccxt_symbol, limit=5)
+        buy_orders = [o for o in closed_orders if o['side'] == 'buy']
+        if buy_orders:
+            entry_price = float(buy_orders[-1].get('price', current_price))
+        else:
+            entry_price = current_price
+
+        # 1) 수수료 포함 최소 익절가 (OKX 매수/매도 수수료 왕복 약 0.1% + 최소 이익 포함 0.15%)
+        fee_rate = 0.0015
+        min_tp_price = entry_price * (1 + fee_rate)
+
+        # 2) 청산가 계산 (롱 포지션 기준: 진입가 * (1 - 1/레버리지 + 마진유지율))
+        maint_margin = 0.005  # 유지 마진율 약 0.5%
+        liq_price = entry_price * (1 - (1 / leverage) + maint_margin)
+        if liq_price < 0:
+            liq_price = 0.0
+except Exception as pe:
+    pass
 
 st.divider()
 
-# --- 2. AI 차트 분석 및 추천 섹션 ---
+# --- 3. 실시간 인터랙티브 차트 (진입가/익절가/청산가 표시) ---
+st.subheader("📊 실시간 차트 & 포지션 라인 표시")
+
+try:
+    ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='1h', limit=30)
+    df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
+
+    fig = go.Figure(data=[go.Candlestick(
+        x=df['datetime'],
+        open=df['open'],
+        high=df['high'],
+        low=df['low'],
+        close=df['close'],
+        name=display_symbol
+    )])
+
+    # 진입가, 익절가, 청산가 표시선 그리기
+    if entry_price > 0:
+        # 🟡 진입가 (실선)
+        fig.add_hline(
+            y=entry_price, line_width=2, line_dash="solid", line_color="#FFD700",
+            annotation_text=f"🟡 진입가: ${entry_price:,.2f}", annotation_position="top left"
+        )
+        # 🟢 수수료 포함 최소익절가 (점선)
+        fig.add_hline(
+            y=min_tp_price, line_width=2, line_dash="dot", line_color="#00FF7F",
+            annotation_text=f"🟢 최소익절가(수수료포함): ${min_tp_price:,.2f}", annotation_position="top right"
+        )
+        # 🔴 청산가 (점선)
+        if liq_price > 0:
+            fig.add_hline(
+                y=liq_price, line_width=2, line_dash="dot", line_color="#FF4500",
+                annotation_text=f"🔴 청산가 ({leverage}x): ${liq_price:,.2f}", annotation_position="bottom right"
+            )
+
+    fig.update_layout(
+        title=f"BTC/USDT 1시간봉 차트 (적용 레버리지: {leverage}x)",
+        yaxis_title="가격 (USDT)",
+        xaxis_title="시간 (KST)",
+        template="plotly_dark",
+        height=550,
+        margin=dict(l=20, r=20, t=40, b=20)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    if entry_price > 0:
+        p_col1, p_col2, p_col3 = st.columns(3)
+        p_col1.info(f"🟡 **포지션 진입가 (실선)**: `${entry_price:,.2f}`")
+        p_col2.success(f"🟢 **수수료 포함 최소익절가 (점선)**: `${min_tp_price:,.2f}`")
+        p_col3.error(f"🔴 **{leverage}x 레버리지 청산가 (점선)**: `${liq_price:,.2f}`")
+    else:
+        st.caption("💡 현재 보유 중인 포지션이 없습니다. 매수 실행 시 진입가, 최소익절가, 청산가가 차트 위에 표시됩니다.")
+
+except Exception as ce:
+    st.error(f"차트 생성 실패: {ce}")
+
+st.divider()
+
+# --- 4. AI 차트 분석 및 추천 섹션 ---
 st.subheader("🤖 AI 차트 분석 및 추천")
 
 if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container_width=True):
     with st.status("🤖 AI 분석을 진행하고 있습니다...", expanded=True) as status:
         try:
             status.write("📊 1. OKX 거래소에서 1시간봉 차트 데이터를 불러오는 중...")
-            ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='1h', limit=15)
-            
             market_data = {
                 "symbol": display_symbol,
                 "current_price": current_price,
+                "leverage": leverage,
                 "usdt_balance": usdt_balance,
                 "btc_balance": btc_balance,
                 "recent_1h_candles": [
                     {"open": c[1], "high": c[2], "low": c[3], "close": c[4], "volume": c[5]}
-                    for c in ohlcv
+                    for c in ohlcv[-15:]
                 ]
             }
 
             prompt = f"""
             당신은 신중하고 전문적인 암호화폐 트레이더입니다.
-            아래 전달된 실시간 시장 데이터와 잔고 상태를 분석하여 매매 전략을 결정하세요.
+            아래 전달된 실시간 시장 데이터, 선택한 레버리지 배율({leverage}x), 잔고 상태를 분석하여 매매 전략을 결정하세요.
 
             [시장 데이터]
             {json.dumps(market_data, indent=2)}
@@ -182,7 +256,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                 except Exception:
                     status.write("⏳ Gemini 무료 한도(20회) 소진/오류. OpenRouter 무료 AI 모음으로 전환합니다.")
 
-            # [2순위] OpenRouter 무료 모델 우회 시도
+            # [2순위] OpenRouter 자동 무료 라우터 시도
             if not raw_text:
                 if not openrouter_key:
                     raise Exception("OPENROUTER_API_KEY가 Streamlit Secrets에 설정되어 있지 않습니다.")
@@ -267,19 +341,19 @@ if st.session_state.ai_result:
 
 st.divider()
 
-# --- 3. 사용자 수동 매매 버튼 섹션 ---
-st.subheader("👆 직접 매매 승인 및 주문")
+# --- 5. 사용자 레버리지 매매 실행 버튼 ---
+st.subheader("👆 직접 매매 승인 및 레버리지 주문")
 
 trade_col1, trade_col2 = st.columns(2)
 
 with trade_col1:
-    st.markdown("#### 🟢 매수 실행")
+    st.markdown(f"#### 🟢 레버리지 ({leverage}x) 매수 실행")
     buy_percent = st.slider("USDT 매수 비중 선택 (%)", min_value=10, max_value=100, value=25, step=5, key="buy_slider")
     
-    if st.button("🚀 선택한 비중으로 시장가 매수", use_container_width=True):
+    if st.button(f"🚀 {leverage}x 레버리지 시장가 매수", use_container_width=True):
         if usdt_balance > 10:
             try:
-                buy_usdt_amount = usdt_balance * (buy_percent / 100)
+                buy_usdt_amount = usdt_balance * (buy_percent / 100) * leverage
                 buy_btc_amount = buy_usdt_amount / current_price
                 
                 order = exchange.create_market_buy_order(ccxt_symbol, buy_btc_amount)
@@ -292,10 +366,10 @@ with trade_col1:
             st.error("보유한 USDT 잔고가 부족합니다 (최소 10 USDT 필요).")
 
 with trade_col2:
-    st.markdown("#### 🔴 매도 실행")
+    st.markdown(f"#### 🔴 레버리지 ({leverage}x) 매도 실행")
     sell_percent = st.slider("BTC 매도 비중 선택 (%)", min_value=10, max_value=100, value=100, step=5, key="sell_slider")
     
-    if st.button("📉 선택한 비중으로 시장가 매도", use_container_width=True):
+    if st.button(f"📉 {leverage}x 레버리지 시장가 매도", use_container_width=True):
         if btc_balance > 0.0001:
             try:
                 sell_btc_amount = btc_balance * (sell_percent / 100)
@@ -311,7 +385,7 @@ with trade_col2:
 
 st.divider()
 
-# --- 4. 포지션 & 미체결 주문 & 매매 히스토리 섹션 ---
+# --- 6. 포지션 & 매매 히스토리 섹션 ---
 st.subheader("📋 계좌 포지션 및 매매 히스토리")
 
 tab1, tab2, tab3 = st.tabs(["💼 보유 포지션 / 잔고", "⏳ 미체결 주문", "📜 매매 히스토리"])
