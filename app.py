@@ -71,10 +71,12 @@ openrouter_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_A
 st.title("📈 OKX AI 트레이딩 대시보드")
 st.caption("AI의 차트 분석 및 판단 근거를 확인하고, 승인 후 매매를 진행하세요.")
 
-symbol = 'BTC/USDT'
+# 화면 표시용 심볼과 CCXT 연동용 표준 심볼 설정
+display_symbol = 'BTCUSDT'
+ccxt_symbol = 'BTC/USDT' if '/' not in display_symbol else display_symbol
 
 try:
-    ticker = exchange.fetch_ticker(symbol)
+    ticker = exchange.fetch_ticker(ccxt_symbol)
     balance = exchange.fetch_balance()
     
     current_price = ticker['last']
@@ -82,7 +84,7 @@ try:
     btc_balance = balance['total'].get('BTC', 0)
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("현재 비트코인(BTC) 시세", f"${current_price:,.2f} USDT")
+    col1.metric(f"현재 비트코인({display_symbol}) 시세", f"${current_price:,.2f} USDT")
     col2.metric("보유 USDT 잔고", f"${usdt_balance:,.2f} USDT")
     col3.metric("보유 BTC 잔고", f"{btc_balance:.6f} BTC")
 
@@ -98,10 +100,10 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
     with st.status("🤖 AI 분석을 진행하고 있습니다...", expanded=True) as status:
         try:
             status.write("📊 1. OKX 거래소에서 1시간봉 차트 데이터를 불러오는 중...")
-            ohlcv = exchange.fetch_ohlcv(symbol, timeframe='1h', limit=15)
+            ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='1h', limit=15)
             
             market_data = {
-                "symbol": symbol,
+                "symbol": display_symbol,
                 "current_price": current_price,
                 "usdt_balance": usdt_balance,
                 "btc_balance": btc_balance,
@@ -140,15 +142,14 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                         contents=prompt
                     )
                     raw_text = res.text
-                except Exception as ge:
-                    status.write(f"⏳ Gemini 한도 소진/오류. OpenRouter 무료 AI 모음으로 전환합니다.")
+                except Exception:
+                    status.write("⏳ Gemini 무료 한도(20회) 소진/오류. OpenRouter 무료 AI 모음으로 전환합니다.")
 
             # [2순위] OpenRouter 자동 무료 라우터 및 최신 무료 모델 우회 시도
             if not raw_text:
                 if not openrouter_key:
                     raise Exception("OPENROUTER_API_KEY가 Streamlit Secrets에 설정되어 있지 않습니다.")
 
-                # OpenRouter 자동 무료 선택 라우터 및 최신 활성 무료 모델 목록
                 free_models = [
                     "openrouter/free",                       # OpenRouter 실시간 자동 무료 선택 라우터
                     "google/gemma-4-31b-it:free",            # 구글 Gemma 4 무료 모델
@@ -241,7 +242,7 @@ with trade_col1:
                 buy_usdt_amount = usdt_balance * (buy_percent / 100)
                 buy_btc_amount = buy_usdt_amount / current_price
                 
-                order = exchange.create_market_buy_order(symbol, buy_btc_amount)
+                order = exchange.create_market_buy_order(ccxt_symbol, buy_btc_amount)
                 st.success(f"✅ 매수 성공! {buy_usdt_amount:.2f} USDT치 BTC 구매 완료 (주문 ID: {order['id']})")
                 st.rerun()
             except Exception as e:
@@ -258,7 +259,7 @@ with trade_col2:
             try:
                 sell_btc_amount = btc_balance * (sell_percent / 100)
                 
-                order = exchange.create_market_sell_order(symbol, sell_btc_amount)
+                order = exchange.create_market_sell_order(ccxt_symbol, sell_btc_amount)
                 st.success(f"✅ 매도 성공! {sell_btc_amount:.6f} BTC 매도 완료 (주문 ID: {order['id']})")
                 st.rerun()
             except Exception as e:
