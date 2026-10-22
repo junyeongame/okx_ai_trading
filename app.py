@@ -2,9 +2,11 @@ import os
 import json
 import time
 import re
+import datetime
 import requests
 import ccxt
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from google import genai
 
@@ -55,7 +57,7 @@ def get_clients():
         'password': passphrase,
         'enableRateLimit': True,
     })
-    exchange.set_sandbox_mode(True)  # 데모 계좌 모드 (실전 매매 시 주석 처리 또는 False)
+    exchange.set_sandbox_mode(True)  # 데모 계좌 모드
 
     ai_client = genai.Client(api_key=gemini_key) if gemini_key else None
     return exchange, ai_client
@@ -69,12 +71,13 @@ except Exception as e:
 openrouter_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", "")
 
 st.title("📈 OKX AI 트레이딩 대시보드")
-st.caption("AI의 차트 분석 및 판단 근거를 확인하고, 승인 후 매매를 진행하세요.")
+st.caption("실시간 차트와 주문 히스토리를 확인하고 AI 판단에 따라 매매를 승인하세요.")
 
-# 화면 표시용 심볼 및 OKX 백엔드 연동 심볼 (현물 규격 적용으로 계정 모드 에러 방지)
+# 거래소 심볼 정의 (표시용: BTCUSDT, CCXT용: BTC/USDT)
 display_symbol = 'BTCUSDT'
 ccxt_symbol = 'BTC/USDT'
 
+# 시세 및 잔고 조회
 try:
     ticker = exchange.fetch_ticker(ccxt_symbol)
     balance = exchange.fetch_balance()
@@ -82,18 +85,51 @@ try:
     current_price = ticker['last']
     usdt_balance = balance['total'].get('USDT', 0)
     btc_balance = balance['total'].get('BTC', 0)
+    total_asset_usdt = usdt_balance + (btc_balance * current_price)
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     col1.metric(f"현재 비트코인({display_symbol}) 시세", f"${current_price:,.2f} USDT")
     col2.metric("보유 USDT 잔고", f"${usdt_balance:,.2f} USDT")
     col3.metric("보유 BTC 잔고", f"{btc_balance:.6f} BTC")
+    col4.metric("총 평가 자산", f"${total_asset_usdt:,.2f} USDT")
 
 except Exception as e:
     st.error(f"거래소 데이터 로드 실패: {e}")
 
 st.divider()
 
-# --- 2. AI 차트 분석 및 판단 섹션 ---
+# --- 1. 실시간 트레이딩뷰 차트 섹션 ---
+st.subheader("📊 실시간 OKX BTCUSDT 차트")
+
+tradingview_html = """
+<div class="tradingview-widget-container" style="height:500px;width:100%;">
+  <div id="tradingview_chart" style="height:calc(100% - 32px);width:100%;"></div>
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <script type="text/javascript">
+  new TradingView.widget(
+  {
+  "autosize": true,
+  "symbol": "OKX:BTCUSDT",
+  "interval": "60",
+  "timezone": "Asia/Seoul",
+  "theme": "dark",
+  "style": "1",
+  "locale": "kr",
+  "toolbar_bg": "#f1f3f6",
+  "enable_publishing": false,
+  "hide_legend": false,
+  "save_image": false,
+  "container_id": "tradingview_chart"
+}
+  );
+  </script>
+</div>
+"""
+components.html(tradingview_html, height=520)
+
+st.divider()
+
+# --- 2. AI 차트 분석 및 추천 섹션 ---
 st.subheader("🤖 AI 차트 분석 및 추천")
 
 if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container_width=True):
@@ -113,7 +149,6 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                 ]
             }
 
-            # AI 프롬프트 (100% 한국어 작성 규칙 명시)
             prompt = f"""
             당신은 신중하고 전문적인 암호화폐 트레이더입니다.
             아래 전달된 실시간 시장 데이터와 잔고 상태를 분석하여 매매 전략을 결정하세요.
@@ -147,16 +182,16 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                 except Exception:
                     status.write("⏳ Gemini 무료 한도(20회) 소진/오류. OpenRouter 무료 AI 모음으로 전환합니다.")
 
-            # [2순위] OpenRouter 자동 무료 라우터 및 최신 무료 모델 우회 시도
+            # [2순위] OpenRouter 무료 모델 우회 시도
             if not raw_text:
                 if not openrouter_key:
                     raise Exception("OPENROUTER_API_KEY가 Streamlit Secrets에 설정되어 있지 않습니다.")
 
                 free_models = [
-                    "openrouter/free",                       # OpenRouter 실시간 자동 무료 선택 라우터
-                    "google/gemma-4-31b-it:free",            # 구글 Gemma 4 무료 모델
-                    "qwen/qwen3.8-27b:free",                 # Qwen 3.8 무료 모델
-                    "nvidia/nemotron-3-super-120b-a12b:free"   # 네모트론 3 슈퍼 무료 모델
+                    "openrouter/free",
+                    "google/gemma-4-31b-it:free",
+                    "qwen/qwen3.8-27b:free",
+                    "nvidia/nemotron-3-super-120b-a12b:free"
                 ]
 
                 headers = {
@@ -197,7 +232,6 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
             status.write("📥 3. AI 분석 결과 정리 중...")
 
-            # <think> 태그 제거 및 정규식을 이용한 pure JSON extraction
             clean_text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL)
             json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             
@@ -250,6 +284,7 @@ with trade_col1:
                 
                 order = exchange.create_market_buy_order(ccxt_symbol, buy_btc_amount)
                 st.success(f"✅ 매수 성공! {buy_usdt_amount:.2f} USDT치 BTC 구매 완료 (주문 ID: {order['id']})")
+                time.sleep(1)
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ 매수 실패: {e}")
@@ -267,8 +302,68 @@ with trade_col2:
                 
                 order = exchange.create_market_sell_order(ccxt_symbol, sell_btc_amount)
                 st.success(f"✅ 매도 성공! {sell_btc_amount:.6f} BTC 매도 완료 (주문 ID: {order['id']})")
+                time.sleep(1)
                 st.rerun()
             except Exception as e:
                 st.error(f"❌ 매도 실패: {e}")
         else:
             st.error("보유한 BTC 수량이 부족합니다.")
+
+st.divider()
+
+# --- 4. 포지션 & 미체결 주문 & 매매 히스토리 섹션 ---
+st.subheader("📋 계좌 포지션 및 매매 히스토리")
+
+tab1, tab2, tab3 = st.tabs(["💼 보유 포지션 / 잔고", "⏳ 미체결 주문", "📜 매매 히스토리"])
+
+with tab1:
+    st.markdown("##### 🪙 현재 코인 보유 상태")
+    btc_value_usdt = btc_balance * current_price
+    btc_ratio = (btc_value_usdt / total_asset_usdt * 100) if total_asset_usdt > 0 else 0
+    usdt_ratio = (usdt_balance / total_asset_usdt * 100) if total_asset_usdt > 0 else 0
+
+    st.markdown(f"""
+    | 자산 | 보유 수량 | 평가 금액 (USDT) | 자산 비중 |
+    | :--- | :--- | :--- | :--- |
+    | **USDT** | `{usdt_balance:,.2f} USDT` | `${usdt_balance:,.2f}` | `{usdt_ratio:.1f}%` |
+    | **BTC** | `{btc_balance:.6f} BTC` | `${btc_value_usdt:,.2f}` | `{btc_ratio:.1f}%` |
+    """)
+
+with tab2:
+    st.markdown("##### ⏳ 대기 중인 미체결 지정가 주문")
+    try:
+        open_orders = exchange.fetch_open_orders(ccxt_symbol)
+        if open_orders:
+            order_rows = []
+            for ord_item in open_orders:
+                dt_str = datetime.datetime.fromtimestamp(ord_item['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                side_str = "🟢 매수" if ord_item['side'] == 'buy' else "🔴 매도"
+                order_rows.append(f"| `{ord_item['id']}` | {dt_str} | {side_str} | `${ord_item['price']:,.2f}` | `{ord_item['amount']:.6f}` | `{ord_item['status']}` |")
+            
+            table_header = "| 주문 ID | 시각 | 구 분 | 주문 가격 | 수 량 | 상 태 |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            st.markdown(table_header + "\n".join(order_rows))
+        else:
+            st.info("현재 대기 중인 미체결 주문이 없습니다.")
+    except Exception as oe:
+        st.warning(f"미체결 주문 조회 중 안내: {oe}")
+
+with tab3:
+    st.markdown("##### 📜 최근 체결된 주문 내역")
+    try:
+        closed_orders = exchange.fetch_closed_orders(ccxt_symbol, limit=10)
+        if closed_orders:
+            history_rows = []
+            for c_ord in reversed(closed_orders):
+                dt_str = datetime.datetime.fromtimestamp(c_ord['timestamp'] / 1000).strftime('%Y-%m-%d %H:%M:%S')
+                side_str = "🟢 매수" if c_ord['side'] == 'buy' else "🔴 매도"
+                filled_qty = c_ord.get('filled', c_ord.get('amount', 0))
+                avg_price = c_ord.get('price', current_price)
+                total_cost = filled_qty * avg_price
+                history_rows.append(f"| {dt_str} | {side_str} | `${avg_price:,.2f}` | `{filled_qty:.6f} BTC` | `${total_cost:,.2f} USDT` | `{c_ord['status']}` |")
+            
+            hist_header = "| 체결 시각 | 구 분 | 평균 체결가 | 체결 수량 | 총 체결금액 | 상 태 |\n| :--- | :--- | :--- | :--- | :--- | :--- |\n"
+            st.markdown(hist_header + "\n".join(history_rows))
+        else:
+            st.info("최근 체결된 매매 내역이 없습니다.")
+    except Exception as he:
+        st.warning(f"매매 히스토리 조회 중 안내: {he}")
