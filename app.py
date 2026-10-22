@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import re
 import requests
 import ccxt
 import streamlit as st
@@ -119,7 +120,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
             [분석 규칙]
             1. 추세와 거래량을 고려하여 확실한 매수 타점일 때만 "buy", 매도 타점일 때 "sell", 불확실하면 "hold"를 선택하세요.
-            2. 응답은 오직 아래 JSON 양식으로만 응답해야 합니다. 다른 서론이나 설명은 금지합니다.
+            2. 응답은 오직 아래 JSON 양식으로만 응답해야 합니다. 다른 서론, 결론, 설명글은 절대 금지합니다.
 
             {{
                 "decision": "buy" 또는 "sell" 또는 "hold",
@@ -140,28 +141,32 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                     )
                     raw_text = res.text
                 except Exception:
-                    status.write("⏳ Gemini 무료 한도(20회) 소진/지연. OpenRouter 무료 AI 모음으로 전환합니다.")
+                    status.write("⏳ Gemini 무료 한도(20회) 소진/오류. OpenRouter 무료 AI 모음으로 전환합니다.")
 
             # [2순위] OpenRouter 무료 모델 우회 시도
             if not raw_text:
                 if not openrouter_key:
                     raise Exception("OPENROUTER_API_KEY가 Streamlit Secrets에 설정되어 있지 않습니다.")
 
-                # OpenRouter에서 현재 100% 무료로 지원되는 모델 우회 목록
+                # OpenRouter 검증된 무료 모델 목록
                 free_models = [
-                    "google/gemini-2.5-flash:free",
+                    "google/gemini-2.0-flash-exp:free",
                     "qwen/qwen-2.5-72b-instruct:free",
                     "deepseek/deepseek-r1:free",
+                    "meta-llama/llama-3.1-8b-instruct:free",
                     "mistralai/mistral-7b-instruct:free"
                 ]
 
+                # OpenRouter 권장/필수 헤더 추가
                 headers = {
                     "Authorization": f"Bearer {openrouter_key.strip()}",
-                    "Content-Type": "application/json"
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://streamlit.io",
+                    "X-Title": "OKX AI Trading Dashboard"
                 }
 
                 for model_slug in free_models:
-                    status.write(f"🧠 OpenRouter 무료 모델({model_slug})에 요청 중...")
+                    status.write(f"🧠 OpenRouter 모델({model_slug})에 요청 중...")
                     payload = {
                         "model": model_slug,
                         "messages": [{"role": "user", "content": prompt}]
@@ -169,18 +174,32 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                     try:
                         res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=15)
                         res_json = res.json()
+                        
                         if "choices" in res_json and len(res_json["choices"]) > 0:
                             raw_text = res_json["choices"][0]["message"]["content"]
                             break
-                    except Exception:
+                        else:
+                            err_info = res_json.get("error", {}).get("message", "응답 없음")
+                            status.write(f"⚠️ {model_slug} 대기/오류: {err_info}")
+                    except Exception as err:
+                        status.write(f"⚠️ {model_slug} 연결 실패: {err}")
                         continue
 
             if not raw_text:
-                raise Exception("모든 무료 AI 모델 연결 실패. 잠시 후 다시 시도해주세요.")
+                raise Exception("모든 무료 AI 모델 연결 실패. OpenRouter API Key 및 네트워크 상태를 확인해주세요.")
 
             status.write("📥 3. AI 분석 결과 정리 중...")
-            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
-            st.session_state.ai_result = json.loads(clean_text)
+
+            # DeepSeek R1의 <think>...</think> 생각 과정 태그 제거
+            clean_text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL)
+            
+            # JSON 객체({ ... }) 영역만 정규식으로 정밀 추출
+            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+            if json_match:
+                st.session_state.ai_result = json.loads(json_match.group(0))
+            else:
+                clean_text = clean_text.replace("```json", "").replace("```", "").strip()
+                st.session_state.ai_result = json.loads(clean_text)
 
             status.update(label="✅ AI 차트 분석 완료!", state="complete", expanded=False)
 
