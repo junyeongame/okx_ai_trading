@@ -130,7 +130,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             """
 
             # 503 과부하 대비: 메인 모델 실패 시 우회할 대체 모델 순서
-            candidate_models = ['gemini-3.8-flash', 'gemini-2.5-flash']
+            candidate_models = ['gemini-3.8-flash', 'gemini-2.5-flash','gemini-1.5-flash','gemini-1.5-pro']
             response = None
             success = False
 
