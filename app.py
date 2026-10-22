@@ -1,10 +1,10 @@
 import os
 import json
 import time
+import requests
 import ccxt
 import streamlit as st
 from dotenv import load_dotenv
-from google import genai
 
 # 1. 환경 변수 로드 및 페이지 기본 설정
 load_dotenv()
@@ -15,7 +15,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# 🔒 비밀번호 잠금 기능 (비밀번호를 입력해야만 화면이 열림)
+# 🔒 비밀번호 잠금 기능
 def check_password():
     if "password_correct" not in st.session_state:
         st.session_state.password_correct = False
@@ -24,7 +24,7 @@ def check_password():
         st.title("🔒 로그인 필요")
         pwd = st.text_input("대시보드 비밀번호를 입력하세요:", type="password")
         if st.button("로그인"):
-            correct_pwd = st.secrets.get("APP_PASSWORD", "1234")
+            correct_pwd = st.secrets.get("APP_PASSWORD", os.getenv("APP_PASSWORD", "1234"))
             if pwd == correct_pwd:
                 st.session_state.password_correct = True
                 st.rerun()
@@ -33,21 +33,18 @@ def check_password():
         return False
     return True
 
-# 비밀번호가 일치하지 않으면 아래 코드를 실행하지 않고 멈춤
 if not check_password():
     st.stop()
 
-# 세션 상태 초기화 (AI 분석 결과를 화면에 유지하기 위함)
 if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
 
-# OKX & Gemini 클라이언트 초기화 함수
+# OKX 클라이언트 초기화
 @st.cache_resource
-def get_clients():
-    api_key = os.getenv("OKX_API_KEY")
-    secret_key = os.getenv("OKX_SECRET_KEY")
-    passphrase = os.getenv("OKX_PASSPHRASE")
-    gemini_api_key = os.getenv("GEMINI_API_KEY")
+def get_exchange():
+    api_key = os.getenv("OKX_API_KEY") or st.secrets.get("OKX_API_KEY")
+    secret_key = os.getenv("OKX_SECRET_KEY") or st.secrets.get("OKX_SECRET_KEY")
+    passphrase = os.getenv("OKX_PASSPHRASE") or st.secrets.get("OKX_PASSPHRASE")
 
     exchange = ccxt.okx({
         'apiKey': api_key,
@@ -55,22 +52,20 @@ def get_clients():
         'password': passphrase,
         'enableRateLimit': True,
     })
-    exchange.set_sandbox_mode(True)  # 데모 계좌 모드 (실전 매매 시 주석 처리 또는 False)
-
-    ai_client = genai.Client(api_key=gemini_api_key)
-    return exchange, ai_client
+    exchange.set_sandbox_mode(True)
+    return exchange
 
 try:
-    exchange, ai_client = get_clients()
+    exchange = get_exchange()
 except Exception as e:
-    st.error(f".env 파일 설정을 확인해주세요: {e}")
+    st.error(f"거래소 연결 설정 오류: {e}")
     st.stop()
 
-# --- 웹 화면 헤더 ---
+openrouter_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", "")
+
 st.title("📈 OKX AI 트레이딩 대시보드")
 st.caption("AI의 차트 분석 및 판단 근거를 확인하고, 승인 후 매매를 진행하세요.")
 
-# --- 1. 실시간 계좌 및 시세 정보 섹션 ---
 symbol = 'BTC/USDT'
 
 try:
@@ -87,7 +82,7 @@ try:
     col3.metric("보유 BTC 잔고", f"{btc_balance:.6f} BTC")
 
 except Exception as e:
-    st.error(f"거래소 데이터를 불러오는 중 오류 발생: {e}")
+    st.error(f"거래소 데이터 로드 실패: {e}")
 
 st.divider()
 
@@ -120,7 +115,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
             [분석 규칙]
             1. 추세와 거래량을 고려하여 확실한 매수 타점일 때만 "buy", 매도 타점일 때 "sell", 불확실하면 "hold"를 선택하세요.
-            2. 응답은 오직 아래 JSON 양식으로만 응답해야 합니다.
+            2. 응답은 오직 아래 JSON 양식으로만 응답해야 합니다. 다른 서론이나 설명은 금지합니다.
 
             {{
                 "decision": "buy" 또는 "sell" 또는 "hold",
@@ -129,36 +124,33 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             }}
             """
 
-            # 올바른 구글 API 소문자 모델명 목록 (유효 한도 있는 모델 우선 우회)
-            candidate_models = [
-                'gemini-2.5-flash',
-                'gemini-2.5-flash-lite',
-                'gemini-1.5-flash',
-                'gemini-3.8-flash'
-            ]
-            
-            response = None
-            success = False
+            status.write("🧠 2. OpenRouter AI (Llama 3.3 70B) 모델에 분석 요청 중...")
 
-            for model_name in candidate_models:
-                status.write(f"🧠 AI 모델({model_name})에 분석 요청 중...")
-                try:
-                    response = ai_client.models.generate_content(
-                        model=model_name,
-                        contents=prompt
-                    )
-                    success = True
-                    break  # 성공 시 재시도 루프 탈출
-                except Exception as e:
-                    status.write(f"⚠️ {model_name} 연결 거부/한도 초과. 다음 모델로 전환합니다.")
-                    continue
+            if not openrouter_key:
+                raise Exception("OPENROUTER_API_KEY가 Secrets에 설정되지 않았습니다.")
 
-            if not success or not response:
-                raise Exception("모든 무료 모델의 하루 이용 한도가 소진되었거나 서버 접속이 원활하지 않습니다.")
+            headers = {
+                "Authorization": f"Bearer {openrouter_key}",
+                "Content-Type": "application/json"
+            }
 
-            status.write("📥 2. AI 분석 결과 정리 중...")
-            raw_text = response.text.replace("```json", "").replace("```", "").strip()
-            st.session_state.ai_result = json.loads(raw_text)
+            payload = {
+                "model": "meta-llama/llama-3.3-70b-instruct:free",
+                "messages": [{"role": "user", "content": prompt}],
+                "response_format": {"type": "json_object"}
+            }
+
+            res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+            res_json = res.json()
+
+            if "choices" not in res_json:
+                raise Exception(f"AI 응답 오류: {res_json}")
+
+            raw_text = res_json["choices"][0]["message"]["content"]
+
+            status.write("📥 3. AI 분석 결과 정리 중...")
+            clean_text = raw_text.replace("```json", "").replace("```", "").strip()
+            st.session_state.ai_result = json.loads(clean_text)
 
             status.update(label="✅ AI 차트 분석 완료!", state="complete", expanded=False)
 
@@ -169,13 +161,11 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 # AI 분석 결과 출력
 if st.session_state.ai_result:
     result = st.session_state.ai_result
-    decision = result.get("decision", "hold").upper()
+    decision = str(result.get("decision", "hold")).upper()
     reason = result.get("reason", "")
     percentage = result.get("percentage", 0)
 
     st.markdown("---")
-    
-    # 추천 상태에 따른 배지 및 색상 설정
     if decision == "BUY":
         st.success(f"### AI 추천: 🟢 {decision} (매수 추천)")
     elif decision == "SELL":
