@@ -130,7 +130,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
             raw_text = None
 
-            # [1순위] Gemini 시도
+            # [1순위] Gemini 3.8 Flash 시도 (하루 20회 무료)
             if ai_client:
                 try:
                     status.write("🧠 1. Gemini 3.8 Flash 모델 분석 시도 중...")
@@ -139,32 +139,44 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                         contents=prompt
                     )
                     raw_text = res.text
-                except Exception as ge:
-                    status.write("⏳ Gemini 무료 한도(20회) 소진 확인. OpenRouter(Llama 3.3)로 전환합니다.")
+                except Exception:
+                    status.write("⏳ Gemini 무료 한도(20회) 소진/지연. OpenRouter 무료 AI 모음으로 전환합니다.")
 
-            # [2순위] OpenRouter 시도 (상세 에러 출력 포함)
+            # [2순위] OpenRouter 무료 모델 우회 시도
             if not raw_text:
                 if not openrouter_key:
                     raise Exception("OPENROUTER_API_KEY가 Streamlit Secrets에 설정되어 있지 않습니다.")
 
-                status.write("🧠 2. OpenRouter (Llama 3.3 70B) 대체 모델에 분석 요청 중...")
+                # OpenRouter에서 현재 100% 무료로 지원되는 모델 우회 목록
+                free_models = [
+                    "google/gemini-2.5-flash:free",
+                    "qwen/qwen-2.5-72b-instruct:free",
+                    "deepseek/deepseek-r1:free",
+                    "mistralai/mistral-7b-instruct:free"
+                ]
+
                 headers = {
                     "Authorization": f"Bearer {openrouter_key.strip()}",
                     "Content-Type": "application/json"
                 }
-                payload = {
-                    "model": "meta-llama/llama-3.3-70b-instruct:free",
-                    "messages": [{"role": "user", "content": prompt}]
-                }
-                
-                res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
-                res_json = res.json()
 
-                if "choices" in res_json and len(res_json["choices"]) > 0:
-                    raw_text = res_json["choices"][0]["message"]["content"]
-                else:
-                    err_msg = res_json.get("error", {}).get("message", str(res_json))
-                    raise Exception(f"OpenRouter 응답 실패 상세 원인: {err_msg}")
+                for model_slug in free_models:
+                    status.write(f"🧠 OpenRouter 무료 모델({model_slug})에 요청 중...")
+                    payload = {
+                        "model": model_slug,
+                        "messages": [{"role": "user", "content": prompt}]
+                    }
+                    try:
+                        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=15)
+                        res_json = res.json()
+                        if "choices" in res_json and len(res_json["choices"]) > 0:
+                            raw_text = res_json["choices"][0]["message"]["content"]
+                            break
+                    except Exception:
+                        continue
+
+            if not raw_text:
+                raise Exception("모든 무료 AI 모델 연결 실패. 잠시 후 다시 시도해주세요.")
 
             status.write("📥 3. AI 분석 결과 정리 중...")
             clean_text = raw_text.replace("```json", "").replace("```", "").strip()
