@@ -130,7 +130,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             """
 
             # 현재 정상 작동하는 최신 Gemini 모델 목록으로 수정
-            candidate_models = ['gemini-3.8-flash','Gemini 3.6 Flash','Gemini 3.5 Flash Lite','Gemini 2.5 Flash', 'Gemini 2.5 Flash Lite','Gemini 3 Flash']
+            candidate_models = ['gemini-3.8-flash','gemini 3.6 Flash','gemini 3.5 Flash Lite','gemini 2.5 Flash', 'gemini 2.5 Flash Lite','gemini 3 Flash']
             response = None
             success = False
 
