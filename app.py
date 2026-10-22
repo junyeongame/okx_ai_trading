@@ -199,4 +199,17 @@ with trade_col1:
 
 with trade_col2:
     st.markdown("#### 🔴 매도 실행")
-    sell_percent = st.slider("BTC 매도 비중 선택 (%)", min_value=10, max_value=100, value=100, step=
+    sell_percent = st.slider("BTC 매도 비중 선택 (%)", min_value=10, max_value=100, value=100, step=5, key="sell_slider")
+    
+    if st.button("📉 선택한 비중으로 시장가 매도", use_container_width=True):
+        if btc_balance > 0.0001:
+            try:
+                sell_btc_amount = btc_balance * (sell_percent / 100)
+                
+                order = exchange.create_market_sell_order(symbol, sell_btc_amount)
+                st.success(f"✅ 매도 성공! {sell_btc_amount:.6f} BTC 매도 완료 (주문 ID: {order['id']})")
+                st.rerun()
+            except Exception as e:
+                st.error(f"❌ 매도 실패: {e}")
+        else:
+            st.error("보유한 BTC 수량이 부족합니다.")
