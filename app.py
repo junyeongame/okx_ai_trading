@@ -129,15 +129,15 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             }}
             """
 
-            # 503 과부하 대비: 메인 모델 실패 시 우회할 대체 모델 순서
-            candidate_models = ['gemini-3.8-flash', 'gemini-2.5-flash','gemini-1.5-flash','gemini-1.5-pro']
+            # 현재 정상 작동하는 최신 Gemini 모델 목록으로 수정
+            candidate_models = ['gemini-3.8-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
             response = None
             success = False
 
             for model_name in candidate_models:
                 status.write(f"🧠 AI 모델({model_name})에 분석 요청 중...")
                 
-                # 모델당 최대 2회 시도
+                # 모델당 최대 2회 재시도
                 for attempt in range(2):
                     try:
                         response = ai_client.models.generate_content(
@@ -148,23 +148,23 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                         break  # 성공 시 재시도 루프 탈출
                     except Exception as e:
                         err_msg = str(e)
+                        # 503 과부하 발생 시 3초 대기 후 재시도
                         if "503" in err_msg or "UNAVAILABLE" in err_msg:
                             if attempt == 0:
-                                wait_sec = 2
-                                status.write(f"⏳ {model_name} 과부하 발생. {wait_sec}초 후 재시도합니다...")
-                                time.sleep(wait_sec)
+                                status.write(f"⏳ {model_name} 순간 과부하 발생. 3초 후 재시도합니다...")
+                                time.sleep(3)
                                 continue
-                        # 503 이외 오류이거나 재시도 실패 시 해당 모델 포기
-                        status.write(f"⚠️ {model_name} 응답 지연. 대체 모델로 전환합니다.")
+                        # 404 및 기타 오류 발생 시 다음 백업 모델로 전환
+                        status.write(f"⚠️ {model_name} 응답 지연/오류. 다음 대체 모델로 전환합니다.")
                         break
 
                 if success:
-                    break  # 성공했으면 모델 전환 루프 종료
+                    break  # 성공했으면 모델 전환 종료
 
             if not success or not response:
-                raise Exception("모든 AI 모델 서버가 현재 트래픽 폭주 상태입니다. 잠시 후 다시 시도해 주세요.")
+                raise Exception("구글 AI 서버 접속이 원활하지 않습니다. 몇 초 후 다시 [AI 차트 분석 시작하기]를 눌러주세요.")
 
-            status.write("📥 2. AI 분석 결과 정돈 중...")
+            status.write("📥 2. AI 분석 결과 정리 중...")
             raw_text = response.text.replace("```json", "").replace("```", "").strip()
             st.session_state.ai_result = json.loads(raw_text)
 
@@ -172,8 +172,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
         except Exception as e:
             status.update(label="❌ AI 분석 실패", state="error", expanded=True)
-            st.error(f"오류 내용: {e}")
-
+            st.error(f"오류 상세 내용: {e}")
 # AI 분석 결과 출력
 if st.session_state.ai_result:
     result = st.session_state.ai_result
