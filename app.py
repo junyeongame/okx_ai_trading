@@ -120,7 +120,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
             [분석 규칙]
             1. 추세와 거래량을 고려하여 확실한 매수 타점일 때만 "buy", 매도 타점일 때 "sell", 불확실하면 "hold"를 선택하세요.
-            2. 응답은 오직 아래 JSON 양식으로만 응답해야 합니다. 다른 서론, 결론, 설명글은 절대 금지합니다.
+            2. 응답은 오직 아래 지정된 JSON 양식으로만 응답해야 합니다. 다른 서론이나 설명은 금지합니다.
 
             {{
                 "decision": "buy" 또는 "sell" 또는 "hold",
@@ -131,7 +131,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
             raw_text = None
 
-            # [1순위] Gemini 3.8 Flash 시도 (하루 20회 무료)
+            # [1순위] Gemini 3.8 Flash 시도
             if ai_client:
                 try:
                     status.write("🧠 1. Gemini 3.8 Flash 모델 분석 시도 중...")
@@ -140,24 +140,22 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                         contents=prompt
                     )
                     raw_text = res.text
-                except Exception:
-                    status.write("⏳ Gemini 무료 한도(20회) 소진/오류. OpenRouter 무료 AI 모음으로 전환합니다.")
+                except Exception as ge:
+                    status.write(f"⏳ Gemini 한도 소진/오류. OpenRouter 무료 AI 모음으로 전환합니다.")
 
-            # [2순위] OpenRouter 무료 모델 우회 시도
+            # [2순위] OpenRouter 자동 무료 라우터 및 최신 무료 모델 우회 시도
             if not raw_text:
                 if not openrouter_key:
                     raise Exception("OPENROUTER_API_KEY가 Streamlit Secrets에 설정되어 있지 않습니다.")
 
-                # OpenRouter 검증된 무료 모델 목록
+                # OpenRouter 자동 무료 선택 라우터 및 최신 활성 무료 모델 목록
                 free_models = [
-                    "google/gemini-2.0-flash-exp:free",
-                    "qwen/qwen-2.5-72b-instruct:free",
-                    "deepseek/deepseek-r1:free",
-                    "meta-llama/llama-3.1-8b-instruct:free",
-                    "mistralai/mistral-7b-instruct:free"
+                    "openrouter/free",                       # OpenRouter 실시간 자동 무료 선택 라우터
+                    "google/gemma-4-31b-it:free",            # 구글 Gemma 4 무료 모델
+                    "qwen/qwen3.8-27b:free",                 # Qwen 3.8 무료 모델
+                    "nvidia/nemotron-3-super-120b-a12b:free"   # 네모트론 3 슈퍼 무료 모델
                 ]
 
-                # OpenRouter 권장/필수 헤더 추가
                 headers = {
                     "Authorization": f"Bearer {openrouter_key.strip()}",
                     "Content-Type": "application/json",
@@ -165,6 +163,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                     "X-Title": "OKX AI Trading Dashboard"
                 }
 
+                last_error = ""
                 for model_slug in free_models:
                     status.write(f"🧠 OpenRouter 모델({model_slug})에 요청 중...")
                     payload = {
@@ -179,22 +178,22 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                             raw_text = res_json["choices"][0]["message"]["content"]
                             break
                         else:
-                            err_info = res_json.get("error", {}).get("message", "응답 없음")
-                            status.write(f"⚠️ {model_slug} 대기/오류: {err_info}")
+                            err_info = res_json.get("error", {}).get("message", str(res_json))
+                            last_error = f"{model_slug}: {err_info}"
+                            status.write(f"⚠️ {model_slug} 실패 ➔ {err_info}")
                     except Exception as err:
-                        status.write(f"⚠️ {model_slug} 연결 실패: {err}")
+                        last_error = str(err)
+                        status.write(f"⚠️ {model_slug} 연결 예외 ➔ {err}")
                         continue
 
             if not raw_text:
-                raise Exception("모든 무료 AI 모델 연결 실패. OpenRouter API Key 및 네트워크 상태를 확인해주세요.")
+                raise Exception(f"모든 AI 모델 연결에 실패했습니다. 마지막 오류: {last_error}")
 
             status.write("📥 3. AI 분석 결과 정리 중...")
 
-            # DeepSeek R1의 <think>...</think> 생각 과정 태그 제거
             clean_text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL)
-            
-            # JSON 객체({ ... }) 영역만 정규식으로 정밀 추출
             json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
+            
             if json_match:
                 st.session_state.ai_result = json.loads(json_match.group(0))
             else:
