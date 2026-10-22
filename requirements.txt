@@ -2,3 +2,6 @@ ccxt
 streamlit
 google-genai
 python-dotenv
+requests
+plotly
+pandas
