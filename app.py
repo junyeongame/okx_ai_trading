@@ -44,7 +44,7 @@ with st.sidebar:
         index=0 if "Dark" in st.session_state.theme_mode else 1
     )
     st.divider()
-    st.caption("OKX AI Trading Bot v2.6")
+    st.caption("OKX AI Trading Bot v2.7")
 
 # 동적 CSS 스타일 정의
 is_dark = "Dark" in st.session_state.theme_mode
@@ -230,7 +230,7 @@ for idx, (label, code) in enumerate(primary_tfs):
             st.rerun()
 
 with tf_cols[7]:
-    with st.popover("m 더보기 (Intervals)", use_container_width=True):
+    with st.popover("⌵ 더보기 (Intervals)", use_container_width=True):
         st.markdown("""
         <div class="interval-info-box">
             <b>ℹ️ Keyboard shortcuts for intervals</b><br>
@@ -336,7 +336,7 @@ with chart_col:
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# --- [MIDDLE: 실시간 호가창 (Order Book - 클릭 시 지정가 연동)] ---
+# --- [MIDDLE: 실시간 호가창 (Order Book - 안전한 2차원 요소 추출 적용)] ---
 with orderbook_col:
     st.markdown("##### 📖 Order Book (호가창)")
     st.caption("💡 가격 버튼 클릭 시 지정가로 자동 세팅됩니다.")
@@ -346,13 +346,14 @@ with orderbook_col:
 
     try:
         ob = exchange.fetch_order_book(ccxt_symbol, limit=5)
-        if ob and 'asks' in ob and 'bids' in ob and len(ob['asks']) > 0:
-            asks = ob['asks'][:5]
-            bids = ob['bids'][:5]
+        if ob and 'asks' in ob and 'bids' in ob and len(ob['asks']) > 0 and len(ob['bids']) > 0:
+            # OKX 응답 배열에서 [가격, 수량] 상위 2개 요소만 안전하게 추출 (ValueError 완전 방지)
+            asks = [[float(x[0]), float(x[1])] for x in ob['asks'][:5] if len(x) >= 2]
+            bids = [[float(x[0]), float(x[1])] for x in ob['bids'][:5] if len(x) >= 2]
     except Exception:
         pass
 
-    # 네트워크/데모 예외 시 실시간 호가 자동 보완 (무한 로딩 방지)
+    # 네트워크/데모 예외 시 실시간 호가 자동 보완
     if not asks or not bids:
         step = 0.50
         asks = [[current_price + (i * step), 0.05 + (i * 0.01)] for i in range(5, 0, -1)]
@@ -590,4 +591,10 @@ with tab_hist:
         st.caption(f"히스토리 정보: {e}")
 
 with tab_asset:
-    btc_val = btc
+    btc_val = btc_balance * current_price
+    st.markdown(f"""
+    | 자산 명 | 보유 수량 | 평가 금액 (USDT) | 비 중 |
+    | :--- | :--- | :--- | :--- |
+    | **USDT** | `{usdt_balance:,.2f} USDT` | `${usdt_balance:,.2f}` | `{(usdt_balance/total_asset_usdt*100) if total_asset_usdt > 0 else 0:.1f}%` |
+    | **BTC** | `{btc_balance:.6f} BTC` | `${btc_val:,.2f}` | `{(btc_val/total_asset_usdt*100) if total_asset_usdt > 0 else 0:.1f}%` |
+    """)
