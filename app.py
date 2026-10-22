@@ -55,7 +55,7 @@ def get_clients():
         'password': passphrase,
         'enableRateLimit': True,
     })
-    exchange.set_sandbox_mode(True)
+    exchange.set_sandbox_mode(True)  # 데모 계좌 모드 (실전 매매 시 주석 처리 또는 False)
 
     ai_client = genai.Client(api_key=gemini_key) if gemini_key else None
     return exchange, ai_client
@@ -71,19 +71,14 @@ openrouter_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_A
 st.title("📈 OKX AI 트레이딩 대시보드")
 st.caption("AI의 차트 분석 및 판단 근거를 확인하고, 승인 후 매매를 진행하세요.")
 
-# BTCUSDT Perp (선물/무기한 계약) 및 Spot 심볼 처리
-display_symbol = 'BTCUSDT Perp'
-
-# OKX API용 CCXT 표준 심볼 (선물: BTC/USDT:USDT / 현물: BTC/USDT)
-try:
-    ccxt_symbol = 'BTC/USDT:USDT'
-    ticker = exchange.fetch_ticker(ccxt_symbol)
-except Exception:
-    ccxt_symbol = 'BTC/USDT'
-    ticker = exchange.fetch_ticker(ccxt_symbol)
+# 화면 표시용 심볼 및 OKX 백엔드 연동 심볼 (현물 규격 적용으로 계정 모드 에러 방지)
+display_symbol = 'BTCUSDT'
+ccxt_symbol = 'BTC/USDT'
 
 try:
+    ticker = exchange.fetch_ticker(ccxt_symbol)
     balance = exchange.fetch_balance()
+    
     current_price = ticker['last']
     usdt_balance = balance['total'].get('USDT', 0)
     btc_balance = balance['total'].get('BTC', 0)
@@ -118,7 +113,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                 ]
             }
 
-            # AI 프롬프트 (한국어 작성 강제 명시)
+            # AI 프롬프트 (100% 한국어 작성 규칙 명시)
             prompt = f"""
             당신은 신중하고 전문적인 암호화폐 트레이더입니다.
             아래 전달된 실시간 시장 데이터와 잔고 상태를 분석하여 매매 전략을 결정하세요.
@@ -127,9 +122,9 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             {json.dumps(market_data, indent=2)}
 
             [분석 및 응답 규칙]
-            1. 모든 분석 이유("reason")와 판단 설명은 **반드시 100% 한국어(한글)**로만 작성해야 합니다. 영어나 다른 언어 사용은 절대 금지합니다.
+            1. 모든 분석 이유("reason")와 판단 설명은 반드시 100% 한국어(한글)로만 작성해야 합니다. 영어나 다른 언어 사용은 절대 금지합니다.
             2. 추세와 거래량을 고려하여 확실한 매수 타점일 때만 "buy", 매도 타점일 때 "sell", 불확실하면 "hold"를 선택하세요.
-            3. 응답은 오직 아래 지정된 JSON 양식으로만 작성해야 하며, 서론이나 코드 블록 설명글은 포함하지 마세요.
+            3. 응답은 오직 아래 지정된 JSON 양식으로만 작성해야 하며, 서론이나 설명글, 코드 블록 표식은 절대 포함하지 마세요.
 
             {{
                 "decision": "buy" 또는 "sell" 또는 "hold",
@@ -158,10 +153,10 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
                     raise Exception("OPENROUTER_API_KEY가 Streamlit Secrets에 설정되어 있지 않습니다.")
 
                 free_models = [
-                    "openrouter/free",
-                    "google/gemma-4-31b-it:free",
-                    "qwen/qwen3.8-27b:free",
-                    "nvidia/nemotron-3-super-120b-a12b:free"
+                    "openrouter/free",                       # OpenRouter 실시간 자동 무료 선택 라우터
+                    "google/gemma-4-31b-it:free",            # 구글 Gemma 4 무료 모델
+                    "qwen/qwen3.8-27b:free",                 # Qwen 3.8 무료 모델
+                    "nvidia/nemotron-3-super-120b-a12b:free"   # 네모트론 3 슈퍼 무료 모델
                 ]
 
                 headers = {
@@ -202,6 +197,7 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
 
             status.write("📥 3. AI 분석 결과 정리 중...")
 
+            # <think> 태그 제거 및 정규식을 이용한 pure JSON extraction
             clean_text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL)
             json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
             
