@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import ccxt
 import streamlit as st
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
+
 # 🔒 비밀번호 잠금 기능 (비밀번호를 입력해야만 화면이 열림)
 def check_password():
     if "password_correct" not in st.session_state:
@@ -126,10 +128,23 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             }}
             """
 
-            response = ai_client.models.generate_content(
-                model='gemini-3.8-flash',
-                contents=prompt
-            )
+            # 503 UNAVAILABLE (서버 트래픽 과부하) 발생 시 자동 재시도 로직 (최대 3회)
+            max_retries = 3
+            response = None
+
+            for attempt in range(max_retries):
+                try:
+                    response = ai_client.models.generate_content(
+                        model='gemini-3.8-flash',
+                        contents=prompt
+                    )
+                    break  # 성공 시 루프 탈출
+                except Exception as e:
+                    if "503" in str(e) or "UNAVAILABLE" in str(e):
+                        if attempt < max_retries - 1:
+                            time.sleep(2)  # 2초 대기 후 재시도
+                            continue
+                    raise e  # 기타 에러 또는 최대 재시도 횟수 초과 시 예외 전달
 
             raw_text = response.text.replace("```json", "").replace("```", "").strip()
             st.session_state.ai_result = json.loads(raw_text)
@@ -184,17 +199,4 @@ with trade_col1:
 
 with trade_col2:
     st.markdown("#### 🔴 매도 실행")
-    sell_percent = st.slider("BTC 매도 비중 선택 (%)", min_value=10, max_value=100, value=100, step=5, key="sell_slider")
-    
-    if st.button("📉 선택한 비중으로 시장가 매도", use_container_width=True):
-        if btc_balance > 0.0001:
-            try:
-                sell_btc_amount = btc_balance * (sell_percent / 100)
-                
-                order = exchange.create_market_sell_order(symbol, sell_btc_amount)
-                st.success(f"✅ 매도 성공! {sell_btc_amount:.6f} BTC 매도 완료 (주문 ID: {order['id']})")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ 매도 실패: {e}")
-        else:
-            st.error("보유한 BTC 수량이 부족합니다.")
+    sell_percent = st.slider("BTC 매도 비중 선택 (%)", min_value=10, max_value=100, value=100, step=
