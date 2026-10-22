@@ -230,7 +230,7 @@ for idx, (label, code) in enumerate(primary_tfs):
             st.rerun()
 
 with tf_cols[7]:
-    with st.popover("⌵ 더보기 (Intervals)", use_container_width=True):
+    with st.popover("m 더보기 (Intervals)", use_container_width=True):
         st.markdown("""
         <div class="interval-info-box">
             <b>ℹ️ Keyboard shortcuts for intervals</b><br>
@@ -260,7 +260,7 @@ with tf_cols[7]:
             if st.button("30m", key="pop_30m"): set_timeframe("30m"); st.rerun()
         with grid_r2[2]:
             if st.button("1h", key="pop_1h"): set_timeframe("1h"); st.rerun()
-        with grid_r3 = st.columns(5) if False else grid_r2[3]:
+        with grid_r2[3]:
             if st.button("2h", key="pop_2h"): set_timeframe("2h"); st.rerun()
         with grid_r2[4]:
             if st.button("4h", key="pop_4h"): set_timeframe("4h"); st.rerun()
@@ -590,10 +590,4 @@ with tab_hist:
         st.caption(f"히스토리 정보: {e}")
 
 with tab_asset:
-    btc_val = btc_balance * current_price
-    st.markdown(f"""
-    | 자산 명 | 보유 수량 | 평가 금액 (USDT) | 비 중 |
-    | :--- | :--- | :--- | :--- |
-    | **USDT** | `{usdt_balance:,.2f} USDT` | `${usdt_balance:,.2f}` | `{(usdt_balance/total_asset_usdt*100) if total_asset_usdt > 0 else 0:.1f}%` |
-    | **BTC** | `{btc_balance:.6f} BTC` | `${btc_val:,.2f}` | `{(btc_val/total_asset_usdt*100) if total_asset_usdt > 0 else 0:.1f}%` |
-    """)
+    btc_val = btc
