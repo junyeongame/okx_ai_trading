@@ -5,6 +5,7 @@ import requests
 import ccxt
 import streamlit as st
 from dotenv import load_dotenv
+from google import genai
 
 # 1. 환경 변수 로드 및 페이지 기본 설정
 load_dotenv()
@@ -39,12 +40,13 @@ if not check_password():
 if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
 
-# OKX 클라이언트 초기화
+# 클라이언트 초기화
 @st.cache_resource
-def get_exchange():
+def get_clients():
     api_key = os.getenv("OKX_API_KEY") or st.secrets.get("OKX_API_KEY")
     secret_key = os.getenv("OKX_SECRET_KEY") or st.secrets.get("OKX_SECRET_KEY")
     passphrase = os.getenv("OKX_PASSPHRASE") or st.secrets.get("OKX_PASSPHRASE")
+    gemini_key = os.getenv("GEMINI_API_KEY") or st.secrets.get("GEMINI_API_KEY")
 
     exchange = ccxt.okx({
         'apiKey': api_key,
@@ -53,12 +55,14 @@ def get_exchange():
         'enableRateLimit': True,
     })
     exchange.set_sandbox_mode(True)
-    return exchange
+
+    ai_client = genai.Client(api_key=gemini_key) if gemini_key else None
+    return exchange, ai_client
 
 try:
-    exchange = get_exchange()
+    exchange, ai_client = get_clients()
 except Exception as e:
-    st.error(f"거래소 연결 설정 오류: {e}")
+    st.error(f"거래소 설정 오류: {e}")
     st.stop()
 
 openrouter_key = os.getenv("OPENROUTER_API_KEY") or st.secrets.get("OPENROUTER_API_KEY", "")
@@ -124,29 +128,45 @@ if st.button("🔍 AI 차트 분석 시작하기", type="primary", use_container
             }}
             """
 
-            status.write("🧠 2. OpenRouter AI (Llama 3.3 70B) 모델에 분석 요청 중...")
+            raw_text = None
 
-            if not openrouter_key:
-                raise Exception("OPENROUTER_API_KEY가 Secrets에 설정되지 않았습니다.")
+            # [1순위] Gemini 3.8 Flash 시도 (하루 20회 무료 한도 소진용)
+            if ai_client:
+                try:
+                    status.write("🧠 1. Gemini 3.8 Flash 모델에 분석 요청 중...")
+                    res = ai_client.models.generate_content(
+                        model='gemini-3.8-flash',
+                        contents=prompt
+                    )
+                    raw_text = res.text
+                except Exception as ge:
+                    status.write(f"⚠️ Gemini 3.8 Flash 한도 초과/서버 응답 지연. OpenRouter로 전환합니다...")
 
-            headers = {
-                "Authorization": f"Bearer {openrouter_key}",
-                "Content-Type": "application/json"
-            }
+            # [2순위] Gemini 한도 다 썼거나 에러 발생 시 OpenRouter(Llama 3.3) 자동 우회
+            if not raw_text and openrouter_key:
+                try:
+                    status.write("🧠 2. OpenRouter (Llama 3.3 70B) 대체 모델에 분석 요청 중...")
+                    headers = {
+                        "Authorization": f"Bearer {openrouter_key}",
+                        "Content-Type": "application/json"
+                    }
+                    payload = {
+                        "model": "meta-llama/llama-3.3-70b-instruct:free",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "response_format": {"type": "json_object"}
+                    }
+                    res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
+                    res_json = res.json()
+                    
+                    if "choices" in res_json:
+                        raw_text = res_json["choices"][0]["message"]["content"]
+                    else:
+                        status.write(f"⚠️ OpenRouter 응답 오류: {res_json}")
+                except Exception as oe:
+                    status.write(f"⚠️ OpenRouter 연결 실패: {oe}")
 
-            payload = {
-                "model": "meta-llama/llama-3.3-70b-instruct:free",
-                "messages": [{"role": "user", "content": prompt}],
-                "response_format": {"type": "json_object"}
-            }
-
-            res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=20)
-            res_json = res.json()
-
-            if "choices" not in res_json:
-                raise Exception(f"AI 응답 오류: {res_json}")
-
-            raw_text = res_json["choices"][0]["message"]["content"]
+            if not raw_text:
+                raise Exception("Gemini 및 OpenRouter 모델 호출에 모두 실패했습니다. Secrets 키 설정을 확인해주세요.")
 
             status.write("📥 3. AI 분석 결과 정리 중...")
             clean_text = raw_text.replace("```json", "").replace("```", "").strip()
