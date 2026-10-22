@@ -13,6 +13,27 @@ st.set_page_config(
     page_icon="📈",
     layout="wide"
 )
+# 🔒 비밀번호 잠금 기능 (비밀번호를 입력해야만 화면이 열림)
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+
+    if not st.session_state.password_correct:
+        st.title("🔒 로그인 필요")
+        pwd = st.text_input("대시보드 비밀번호를 입력하세요:", type="password")
+        if st.button("로그인"):
+            correct_pwd = st.secrets.get("APP_PASSWORD", "1234")
+            if pwd == correct_pwd:
+                st.session_state.password_correct = True
+                st.rerun()
+            else:
+                st.error("❌ 비밀번호가 올바르지 않습니다.")
+        return False
+    return True
+
+# 비밀번호가 일치하지 않으면 아래 코드를 실행하지 않고 멈춤
+if not check_password():
+    st.stop()
 
 # 세션 상태 초기화 (AI 분석 결과를 화면에 유지하기 위함)
 if "ai_result" not in st.session_state:
