@@ -24,10 +24,10 @@ st.set_page_config(
 
 # 🔒 세션 상태 초기화
 if "theme_mode" not in st.session_state:
-    st.session_state.theme_mode = "Dark (다크 모드)"
+    st.session_state.theme_mode = "Light (밝은 모드)"
 
 if "active_tf" not in st.session_state:
-    st.session_state.active_tf = "5m"
+    st.session_state.active_tf = "1m"
 
 if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
@@ -48,119 +48,112 @@ for k, default_val in default_defaults.items():
     if k not in st.session_state:
         st.session_state[k] = default_val
 
-# 동적 CSS 테마 색상 설정 (딥 다크 기본)
+# 동적 CSS 테마 색상 설정
 is_dark = "Dark" in st.session_state.theme_mode
 
-bg_color = "#000000" if is_dark else "#ffffff"
-card_bg = "#08090c" if is_dark else "#f8f9fa"
-input_bg = "#131722" if is_dark else "#f0f2f5"
-text_color = "#d1d4dc" if is_dark else "#111827"
-border_color = "#2a2e39" if is_dark else "#d1d5db"
-grid_color = "#1e222d" if is_dark else "#e5e7eb"
+bg_color = "#0b0e11" if is_dark else "#ffffff"
+card_bg = "#11151c" if is_dark else "#ffffff"
+input_bg = "#1e2329" if is_dark else "#f5f7fa"
+text_color = "#eaecef" if is_dark else "#1e2329"
+muted_color = "#848e9c" if is_dark else "#707a8a"
+border_color = "#2b3139" if is_dark else "#e1e5eb"
+grid_color = "#252a32" if is_dark else "#e8ecf1"
 
 st.markdown(f"""
 <style>
-    /* 1. 사이드바 숨기기 */
-    [data-testid="stSidebar"] {{
-        display: none !important;
-    }}
-    
-    /* 2. 전체 메인 앱 배경 */
-    .stApp, div[data-testid="stHeader"], div[data-testid="stToolbar"] {{
+    [data-testid="stSidebar"] {{ display: none !important; }}
+
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stHeader"],
+    [data-testid="stToolbar"] {{
         background-color: {bg_color} !important;
         color: {text_color} !important;
     }}
 
-    /* 3. 컬럼 레이아웃 간격 최적화 */
-    div[data-testid="stHorizontalBlock"] {{
-        gap: 6px !important;
+    [data-testid="stHorizontalBlock"] {{ gap: 6px !important; }}
+
+    [data-testid="column"] > div {{
+        background-color: {card_bg};
+        border: 1px solid {border_color};
+        border-radius: 5px;
+        padding: 6px 10px;
     }}
 
-    /* 4. 영역 분리 카드 디자인 */
-    div[data-testid="column"] > div {{
-        background-color: {card_bg} !important;
-        border: 1px solid {border_color} !important;
-        border-radius: 4px !important;
-        padding: 6px 10px !important;
-    }}
-
-    /* 5. 모든 텍스트 라벨 가독성 적용 */
-    label, p, span, h1, h2, h3, h4, h5, h6, div[data-testid="stWidgetLabel"], div[data-testid="stMarkdownContainer"] {{
+    /* 텍스트 색상은 상속시키되 span의 인라인 색상(상승/하락색)은 덮어쓰지 않음 */
+    label, p, h1, h2, h3, h4, h5, h6,
+    [data-testid="stWidgetLabel"],
+    [data-testid="stMarkdownContainer"] {{
         color: {text_color} !important;
     }}
 
-    /* 6. 입력 상자 다크/라이트 글자색 적용 */
-    div[data-baseweb="input"], 
-    div[data-baseweb="input"] > div,
-    div[data-baseweb="base-input"],
+    [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] * {{ color: {muted_color}; }}
+
+    [data-baseweb="input"] > div,
+    [data-baseweb="base-input"],
+    [data-baseweb="select"] > div,
     input, textarea, select {{
         background-color: {input_bg} !important;
         color: {text_color} !important;
-        border: 1px solid {border_color} !important;
+        border-color: {border_color} !important;
         border-radius: 4px !important;
     }}
 
-    input[type="number"] {{
+    [data-testid="stButton"] > button {{
+        background-color: {input_bg} !important;
         color: {text_color} !important;
-        background-color: {input_bg} !important;
-    }}
-
-    /* 7. 일반/꺼짐 버튼 기본 스타일 */
-    div.stButton > button {{
-        background-color: {input_bg} !important;
-        color: #848e9c !important;
-        border: 1px solid #2a2e39 !important;
-        border-radius: 3px !important;
+        border: 1px solid {border_color} !important;
+        border-radius: 4px !important;
         padding: 1px 4px !important;
-        min-height: 24px !important;
-        height: 24px !important;
+        min-height: 26px !important;
+        height: 26px !important;
         font-size: 11px !important;
         font-weight: 500 !important;
     }}
 
-    /* 🔥 [핵심] ON (활성화) 상태의 Primary 버튼 - 골드/노랑 불빛 강조 스타일 */
-    div.stButton > button[kind="primary"] {{
+    [data-testid="stButton"] > button[kind="primary"] {{
         background-color: #f0b90b !important;
-        color: #000000 !important;
-        border: 1px solid #f0b90b !important;
-        font-weight: bold !important;
-        box-shadow: 0 0 6px rgba(240, 185, 11, 0.6) !important;
-    }}
-
-    div.stButton > button:hover {{
+        color: #111111 !important;
         border-color: #f0b90b !important;
-        color: #ffffff !important;
+        font-weight: 700 !important;
+        box-shadow: 0 0 6px rgba(240, 185, 11, 0.35) !important;
     }}
 
-    /* 8. 팝오버 메뉴 스타일 */
+    [data-testid="stButton"] > button:hover {{
+        border-color: #f0b90b !important;
+    }}
+
     button[data-testid="stBaseButton-popover"],
-    div[data-testid="stPopover"] > button {{
+    [data-testid="stPopover"] > button {{
         background-color: {input_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
-        min-height: 24px !important;
-        height: 24px !important;
+        min-height: 26px !important;
+        height: 26px !important;
         font-size: 11px !important;
-        padding: 0px 6px !important;
-        border-radius: 3px !important;
+        padding: 0 6px !important;
+        border-radius: 4px !important;
     }}
-    div[data-testid="stPopoverBody"], div[data-baseweb="popover"] {{
+
+    [data-testid="stPopoverBody"],
+    [data-baseweb="popover"] {{
         background-color: {card_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
         border-radius: 6px !important;
     }}
 
-    /* OKX Header Bar */
     .okx-header {{
         background-color: {input_bg};
-        padding: 6px 14px;
-        border-radius: 4px;
+        color: {text_color};
+        padding: 7px 12px;
+        border-radius: 5px;
         border: 1px solid {border_color};
         margin-bottom: 6px;
     }}
-    .okx-price-up {{ color: #26a69a; font-weight: bold; }}
-    .okx-price-down {{ color: #ef5350; font-weight: bold; }}
+    .okx-price-up {{ color: #26a69a !important; font-weight: bold; }}
+    .okx-price-down {{ color: #ef5350 !important; font-weight: bold; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -460,7 +453,7 @@ with chart_col:
         paper_bgcolor=card_bg,
         plot_bgcolor=card_bg,
         font=dict(color=text_color, size=11),
-        height=580,
+        height=430,
         margin=dict(l=10, r=60, t=15, b=15),
         xaxis_rangeslider_visible=False,
         showlegend=False,
@@ -484,7 +477,7 @@ with chart_col:
 
 # --- [RIGHT: 주문 패널 카드] ---
 with trade_col:
-    st.markdown("<div style='font-weight: bold; font-size: 13px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #2a2e39;'>⚡ Trade Panel</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-weight: bold; font-size: 13px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid {border_color};'>⚡ Trade Panel</div>", unsafe_allow_html=True)
     
     leverage = st.slider("🎯 레버리지 배율 (1x ~ 50x)", min_value=1, max_value=50, value=10, step=1)
     order_mode = st.radio("주문 타입", ["지정가 (Limit)", "시장가 (Market)"], horizontal=True)
