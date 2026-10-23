@@ -32,14 +32,23 @@ if "active_tf" not in st.session_state:
 if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
 
+# 지표 토글 세션 상태 초기화
+indicator_keys = ['show_ma20', 'show_ma50', 'show_ma200', 'show_ema20', 'show_bollinger', 'show_volume', 'show_rsi', 'show_macd']
+default_defaults = {'show_ma20': True, 'show_ma50': True, 'show_ma200': True, 'show_ema20': True, 'show_bollinger': True, 'show_volume': True, 'show_rsi': False, 'show_macd': False}
+
+for k, default_val in default_defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = default_val
+
 # 동적 CSS 테마 색상 설정
 is_dark = "Dark" in st.session_state.theme_mode
 
-bg_color = "#000000" if is_dark else "#f4f5f8"
-card_bg = "#000000" if is_dark else "#ffffff"
-input_bg = "#131722" if is_dark else "#f0f2f5"
-text_color = "#d1d4dc" if is_dark else "#111827"
-border_color = "#2a2e39" if is_dark else "#e5e7eb"
+bg_color = "#000000" if is_dark else "#ffffff"
+card_bg = "#0c0d10" if is_dark else "#f8f9fa"
+input_bg = "#161a22" if is_dark else "#f0f2f5"
+text_color = "#e6e8ea" if is_dark else "#111827"
+border_color = "#2a2e39" if is_dark else "#d1d5db"
+grid_color = "#1e222d" if is_dark else "#e5e7eb"
 
 st.markdown(f"""
 <style>
@@ -48,31 +57,31 @@ st.markdown(f"""
         display: none !important;
     }}
     
-    /* 2. 전체 메인 앱 배경 */
+    /* 2. 전체 메인 앱 배경 및 기본 글자색 강제 적용 */
     .stApp, div[data-testid="stHeader"], div[data-testid="stToolbar"] {{
         background-color: {bg_color} !important;
         color: {text_color} !important;
     }}
 
-    /* 3. 컬럼 레이아웃 간격 최적화 */
+    /* 3. 컬럼 레이아웃 간격 */
     div[data-testid="stHorizontalBlock"] {{
-        gap: 10px !important;
+        gap: 8px !important;
     }}
 
     /* 4. 영역 분리 카드 디자인 */
     div[data-testid="column"] > div {{
         background-color: {card_bg} !important;
         border: 1px solid {border_color} !important;
-        border-radius: 4px !important;
+        border-radius: 6px !important;
         padding: 8px 12px !important;
     }}
 
-    /* 5. 텍스트 글자색 적용 */
-    label, p, span, h1, h2, h3, h4, h5, h6, div[data-testid="stWidgetLabel"] {{
+    /* 5. 모든 텍스트 라벨 가독성 강제 적용 */
+    label, p, span, h1, h2, h3, h4, h5, h6, div[data-testid="stWidgetLabel"], div[data-testid="stMarkdownContainer"] {{
         color: {text_color} !important;
     }}
 
-    /* 6. 입력창, 선택박스 스타일 */
+    /* 6. 입력 상자 다크/라이트 글자색 안보임 수정 */
     div[data-baseweb="input"], 
     div[data-baseweb="input"] > div,
     div[data-baseweb="base-input"],
@@ -83,13 +92,18 @@ st.markdown(f"""
         border-radius: 4px !important;
     }}
 
-    /* 7. 타임프레임 및 버튼 스타일 */
+    input[type="number"] {{
+        color: {text_color} !important;
+        background-color: {input_bg} !important;
+    }}
+
+    /* 7. 일반 버튼 및 지표 토글 버튼 스타일 */
     div.stButton > button {{
         background-color: {input_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
         border-radius: 4px !important;
-        padding: 2px 8px !important;
+        padding: 2px 6px !important;
         min-height: 26px !important;
         height: 26px !important;
         font-size: 11px !important;
@@ -99,7 +113,7 @@ st.markdown(f"""
         color: #f0b90b !important;
     }}
 
-    /* 8. 팝오버(Popover - 설정 및 더보기) 오버라이드 */
+    /* 8. 팝오버 메뉴 다크/라이트 스타일 */
     button[data-testid="stBaseButton-popover"],
     div[data-testid="stPopover"] > button {{
         background-color: {input_bg} !important;
@@ -122,7 +136,7 @@ st.markdown(f"""
     .okx-header {{
         background-color: {input_bg};
         padding: 6px 14px;
-        border-radius: 4px;
+        border-radius: 6px;
         border: 1px solid {border_color};
         margin-bottom: 8px;
     }}
@@ -201,7 +215,7 @@ except Exception as e:
     st.error(f"거래소 데이터 로드 실패: {e}")
     st.stop()
 
-# --- 1. Top Header Bar & 복구된 설정(다크모드) 창 ---
+# --- 1. Top Header Bar & 설정(다크모드) 창 ---
 change_class = "okx-price-up" if change_24h >= 0 else "okx-price-down"
 change_sign = "+" if change_24h >= 0 else ""
 
@@ -241,8 +255,8 @@ with settings_col:
             st.session_state.theme_mode = new_theme
             st.rerun()
 
-# --- 2. 상단 타임프레임 및 '더보기' 컨트롤 바 ---
-tf_cols = st.columns([0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 1.2, 5])
+# --- 2. 상단 타임프레임 및 지표 온/오프 토글 바 ---
+tf_cols = st.columns([0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.9, 0.6, 0.6, 0.7, 0.7, 0.7, 0.7, 0.6, 0.6])
 
 def set_timeframe(tf_code):
     st.session_state.active_tf = tf_code
@@ -297,33 +311,43 @@ with tf_cols[7]:
         with grid_r3[4]:
             if st.button("3D", key="pop_3d"): set_timeframe("3d"); st.rerun()
 
-        grid_r4 = st.columns(5)
-        with grid_r4[0]:
-            if st.button("5D", key="pop_5d"): set_timeframe("5d"); st.rerun()
-        with grid_r4[1]:
-            if st.button("1W", key="pop_1w"): set_timeframe("1w"); st.rerun()
-        with grid_r4[2]:
-            if st.button("1M", key="pop_1M"): set_timeframe("1M"); st.rerun()
-        with grid_r4[3]:
-            if st.button("3M", key="pop_3M"): set_timeframe("3M"); st.rerun()
+# --- 🔥 지표 토글 버튼 (이미지 동일 구현) ---
+indicators = [
+    ("MA20", "show_ma20", 8),
+    ("MA50", "show_ma50", 9),
+    ("MA200", "show_ma200", 10),
+    ("EMA20", "show_ema20", 11),
+    ("볼린저", "show_bollinger", 12),
+    ("거래량", "show_volume", 13),
+    ("RSI", "show_rsi", 14),
+    ("MACD", "show_macd", 15)
+]
 
-# --- 3. 메인 2컬럼 레이아웃 (좌: 와이드 차트 | 우: 주문 패널) ---
+for label, key, col_idx in indicators:
+    with tf_cols[col_idx]:
+        is_on = st.session_state[key]
+        b_type = "primary" if is_on else "secondary"
+        if st.button(label, key=f"btn_ind_{key}", type=b_type, use_container_width=True):
+            st.session_state[key] = not st.session_state[key]
+            st.rerun()
+
+# --- 3. 메인 2컬럼 레이아웃 (차트 | 주문 패널) ---
 chart_col, trade_col = st.columns([7.8, 2.2])
 
-# --- [LEFT: 전문 트레이딩뷰 스타일 차트 패널] ---
+# --- [LEFT: 차트 패널] ---
 with chart_col:
     timeframe = st.session_state.active_tf
 
     try:
-        limit_cnt = 80
+        limit_cnt = 100
         ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, limit=limit_cnt)
     except Exception:
-        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='5m', limit=80)
+        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='5m', limit=100)
 
     df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
 
-    # 보조 지표 계산 (MA20, MA50, MA200, EMA20, 볼린저밴드)
+    # 보조 지표 계산
     df['MA20'] = df['close'].rolling(window=20).mean()
     df['MA50'] = df['close'].rolling(window=50).mean()
     df['MA200'] = df['close'].rolling(window=200).mean()
@@ -333,69 +357,106 @@ with chart_col:
     df['BB_Upper'] = df['MA20'] + (std20 * 2)
     df['BB_Lower'] = df['MA20'] - (std20 * 2)
 
+    # RSI 지표
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+
+    # MACD 지표
+    ema12 = df['close'].ewm(span=12, adjust=False).mean()
+    ema26 = df['close'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = ema12 - ema26
+    df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
+
+    # 서브차트 개수 계산 (메인 캔들 + 거래량/RSI/MACD 추가 여부)
+    rows_cnt = 1
+    row_heights = [0.7]
+
+    has_volume = st.session_state.show_volume
+    has_rsi = st.session_state.show_rsi
+    has_macd = st.session_state.show_macd
+
+    extra_rows = [has_volume, has_rsi, has_macd].count(True)
+    if extra_rows > 0:
+        rows_cnt += extra_rows
+        sub_h = 0.3 / extra_rows
+        row_heights = [0.7] + [sub_h] * extra_rows
+
     fig = make_subplots(
-        rows=1, cols=1, shared_xaxes=True
+        rows=rows_cnt, cols=1, shared_xaxes=True,
+        vertical_spacing=0.03, row_heights=row_heights
     )
 
-    # 1. 캔들스틱 차트
+    # 1. 메인 캔들스틱 차트
     fig.add_trace(go.Candlestick(
         x=df['datetime'], open=df['open'], high=df['high'],
         low=df['low'], close=df['close'], name='BTC/USDT',
         increasing_line_color='#26a69a', increasing_fillcolor='#26a69a',
         decreasing_line_color='#ef5350', decreasing_fillcolor='#ef5350'
-    ))
+    ), row=1, col=1)
 
-    # 2. 이동평균선 & 이평선
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20'], line=dict(color='#ff9800', width=1.5), name='MA20'))
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA50'], line=dict(color='#2196f3', width=1.5), name='MA50'))
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA200'], line=dict(color='#9c27b0', width=1.5), name='MA200'))
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['EMA20'], line=dict(color='#00e676', width=1.5), name='EMA20'))
+    # 지표 온/오프 반영
+    if st.session_state.show_ma20:
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20'], line=dict(color='#ff9800', width=1.5), name='MA20'), row=1, col=1)
+    if st.session_state.show_ma50:
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA50'], line=dict(color='#2196f3', width=1.5), name='MA50'), row=1, col=1)
+    if st.session_state.show_ma200:
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA200'], line=dict(color='#9c27b0', width=1.5), name='MA200'), row=1, col=1)
+    if st.session_state.show_ema20:
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['EMA20'], line=dict(color='#00e676', width=1.5), name='EMA20'), row=1, col=1)
+    if st.session_state.show_bollinger:
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['BB_Upper'], line=dict(color='#7e57c2', width=1, dash='dot'), name='BB Upper'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['BB_Lower'], line=dict(color='#7e57c2', width=1, dash='dot'), name='BB Lower'), row=1, col=1)
 
-    # 3. 볼린저 밴드
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['BB_Upper'], line=dict(color='#7e57c2', width=1, dash='dot'), name='BB Upper'))
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['BB_Lower'], line=dict(color='#7e57c2', width=1, dash='dot'), name='BB Lower'))
-
-    # 4. 현재가 점선 라인
+    # 현재가 점선 라인
     fig.add_hline(
         y=current_price, line_dash="dash", line_color="#26a69a", line_width=1.2,
         annotation_text=f" {current_price:,.1f}", annotation_position="right",
-        annotation_font=dict(color="#ffffff", size=11), annotation_bgcolor="#26a69a"
+        annotation_font=dict(color="#ffffff", size=11), annotation_bgcolor="#26a69a",
+        row=1, col=1
     )
 
-    # 차트 배경색 다크/라이트 동적 반영
-    plotly_bg = card_bg
+    curr_row = 2
+    if has_volume:
+        vol_colors = ['#26a69a' if r['close'] >= r['open'] else '#ef5350' for _, r in df.iterrows()]
+        fig.add_trace(go.Bar(x=df['datetime'], y=df['volume'], marker_color=vol_colors, name='Volume'), row=curr_row, col=1)
+        curr_row += 1
+
+    if has_rsi:
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['RSI'], line=dict(color='#f0b90b', width=1.2), name='RSI'), row=curr_row, col=1)
+        fig.add_hline(y=70, line_dash="dash", line_color="#ef5350", line_width=1, row=curr_row, col=1)
+        fig.add_hline(y=30, line_dash="dash", line_color="#26a69a", line_width=1, row=curr_row, col=1)
+        curr_row += 1
+
+    if has_macd:
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MACD'], line=dict(color='#2196f3', width=1.2), name='MACD'), row=curr_row, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MACD_Signal'], line=dict(color='#ff9800', width=1.2), name='Signal'), row=curr_row, col=1)
+        hist_colors = ['#26a69a' if v >= 0 else '#ef5350' for v in df['MACD_Hist']]
+        fig.add_trace(go.Bar(x=df['datetime'], y=df['MACD_Hist'], marker_color=hist_colors, name='Hist'), row=curr_row, col=1)
 
     fig.update_layout(
-        paper_bgcolor=plotly_bg,
-        plot_bgcolor=plotly_bg,
+        paper_bgcolor=card_bg,
+        plot_bgcolor=card_bg,
         font=dict(color=text_color, size=11),
         height=580,
-        margin=dict(l=10, r=60, t=25, b=20),
+        margin=dict(l=10, r=60, t=15, b=15),
         xaxis_rangeslider_visible=False,
         showlegend=False,
         hovermode="x unified",
-        dragmode='pan',
-        
-        yaxis=dict(
-            side="right",
-            gridcolor="#1e222d" if is_dark else "#e5e7eb",
-            zerolinecolor="#1e222d" if is_dark else "#e5e7eb",
-            showgrid=True,
-            fixedrange=False
-        ),
-        xaxis=dict(
-            gridcolor="#1e222d" if is_dark else "#e5e7eb",
-            zerolinecolor="#1e222d" if is_dark else "#e5e7eb",
-            showgrid=True,
-            fixedrange=False
-        )
+        dragmode='pan'
     )
+
+    fig.update_yaxes(side="right", gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True, fixedrange=False)
+    fig.update_xaxes(gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True, fixedrange=False)
 
     st.plotly_chart(
         fig,
         use_container_width=True,
         config={
-            'scrollZoom': True,           # 마우스 휠로 확대/축소
+            'scrollZoom': True,
             'displayModeBar': True,
             'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
             'displaylogo': False
