@@ -24,7 +24,7 @@ st.set_page_config(
 
 # 🔒 세션 상태 초기화
 if "theme_mode" not in st.session_state:
-    st.session_state.theme_mode = "Light (밝은 모드)"
+    st.session_state.theme_mode = "Dark (다크 모드)"
 
 if "active_tf" not in st.session_state:
     st.session_state.active_tf = "1m"
@@ -46,8 +46,8 @@ default_defaults = {
     'show_ema20': True,
     'show_bollinger': True,
     'show_volume': True,
-    'show_rsi': False,
-    'show_macd': False
+    'show_rsi': True,
+    'show_macd': True
 }
 
 for k, default_val in default_defaults.items():
@@ -67,99 +67,60 @@ grid_color = "#252a32" if is_dark else "#e8ecf1"
 
 st.markdown(f"""
 <style>
-    [data-testid="stSidebar"] {{ display: none !important; }}
-
-    .stApp,
-    [data-testid="stAppViewContainer"],
-    [data-testid="stHeader"],
-    [data-testid="stToolbar"] {{
-        background-color: {bg_color} !important;
-        color: {text_color} !important;
+    [data-testid="stSidebar"] {{ display:none !important; }}
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stMain"],
+    [data-testid="stHeader"], [data-testid="stToolbar"] {{
+        background:{bg_color} !important; color:{text_color} !important;
     }}
-
-    [data-testid="stHorizontalBlock"] {{ gap: 6px !important; }}
-
+    [data-testid="stMainBlockContainer"] {{
+        max-width:none !important; padding:8px 12px 16px !important;
+    }}
+    [data-testid="stHorizontalBlock"] {{ gap:5px !important; }}
     [data-testid="column"] > div {{
-        background-color: {card_bg};
-        border: 1px solid {border_color};
-        border-radius: 5px;
-        padding: 6px 10px;
+        background:transparent; border:0; border-radius:0; padding:0 2px;
     }}
-
-    /* 텍스트 색상은 상속시키되 span의 인라인 색상(상승/하락색)은 덮어쓰지 않음 */
     label, p, h1, h2, h3, h4, h5, h6,
-    [data-testid="stWidgetLabel"],
-    [data-testid="stMarkdownContainer"] {{
-        color: {text_color} !important;
+    [data-testid="stWidgetLabel"], [data-testid="stMarkdownContainer"] {{
+        color:{text_color} !important;
     }}
-
-    [data-testid="stCaptionContainer"],
-    [data-testid="stCaptionContainer"] * {{ color: {muted_color}; }}
-
-    [data-baseweb="input"] > div,
-    [data-baseweb="base-input"],
-    [data-baseweb="select"] > div,
-    input, textarea, select {{
-        background-color: {input_bg} !important;
-        color: {text_color} !important;
-        border-color: {border_color} !important;
-        border-radius: 4px !important;
+    [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * {{color:{muted_color} !important;}}
+    [data-baseweb="input"] > div, [data-baseweb="base-input"],
+    [data-baseweb="select"] > div, input, textarea, select {{
+        background:{input_bg} !important; color:{text_color} !important;
+        border-color:{border_color} !important; border-radius:3px !important;
     }}
-
     [data-testid="stButton"] > button {{
-        background-color: {input_bg} !important;
-        color: {text_color} !important;
-        border: 1px solid {border_color} !important;
-        border-radius: 4px !important;
-        padding: 1px 4px !important;
-        min-height: 26px !important;
-        height: 26px !important;
-        font-size: 11px !important;
-        font-weight: 500 !important;
+        background:#101319 !important; color:#c6ccd5 !important;
+        border:1px solid #303641 !important; border-radius:2px !important;
+        min-height:25px !important; height:25px !important; padding:0 5px !important;
+        font-size:10px !important; font-weight:600 !important;
     }}
-
     [data-testid="stButton"] > button[kind="primary"] {{
-        background-color: #f0b90b !important;
-        color: #111111 !important;
-        border-color: #f0b90b !important;
-        font-weight: 700 !important;
-        box-shadow: 0 0 6px rgba(240, 185, 11, 0.35) !important;
+        background:#e5ad18 !important; color:#111 !important; border-color:#e5ad18 !important;
+        box-shadow:none !important;
     }}
-
-    [data-testid="stButton"] > button:hover {{
-        border-color: #f0b90b !important;
+    [data-testid="stButton"] > button:hover {{border-color:#e5ad18 !important;}}
+    [data-testid="stPopover"] > button, button[data-testid="stBaseButton-popover"] {{
+        background:#101319 !important; color:#d5d9df !important;
+        border:1px solid #303641 !important; border-radius:2px !important;
+        min-height:25px !important; height:25px !important; font-size:10px !important;
     }}
-
-    button[data-testid="stBaseButton-popover"],
-    [data-testid="stPopover"] > button {{
-        background-color: {input_bg} !important;
-        color: {text_color} !important;
-        border: 1px solid {border_color} !important;
-        min-height: 26px !important;
-        height: 26px !important;
-        font-size: 11px !important;
-        padding: 0 6px !important;
-        border-radius: 4px !important;
+    [data-testid="stTabs"] [data-baseweb="tab-list"] {{gap:3px; background:#0d1015;}}
+    [data-testid="stTabs"] button[role="tab"] {{
+        color:#9ca5b2 !important; font-size:11px !important; padding:5px 8px !important;
     }}
-
-    [data-testid="stPopoverBody"],
-    [data-baseweb="popover"] {{
-        background-color: {card_bg} !important;
-        color: {text_color} !important;
-        border: 1px solid {border_color} !important;
-        border-radius: 6px !important;
-    }}
-
-    .okx-header {{
-        background-color: {input_bg};
-        color: {text_color};
-        padding: 7px 12px;
-        border-radius: 5px;
-        border: 1px solid {border_color};
-        margin-bottom: 6px;
-    }}
-    .okx-price-up {{ color: #26a69a !important; font-weight: bold; }}
-    .okx-price-down {{ color: #ef5350 !important; font-weight: bold; }}
+    [data-testid="stTabs"] button[aria-selected="true"] {{color:#f0b90b !important; border-bottom-color:#f0b90b !important;}}
+    [data-testid="stPlotlyChart"] {{border:1px solid #252a32; background:#080a0e;}}
+    .okx-header {{background:#0d1015; border:1px solid #252a32; padding:5px 9px; margin:0 0 5px; border-radius:2px; color:#d8dce3;}}
+    .terminal-strip {{background:#0d1015; border:1px solid #252a32; padding:5px 8px; margin:0 0 5px; color:#9ca5b2; font:10px Arial,sans-serif;}}
+    .terminal-card {{background:#0c0f13; border:1px solid #34302a; padding:8px; margin:0 0 6px;}}
+    .terminal-card-title {{font-size:11px; font-weight:700; color:#e5ad18; border-bottom:1px solid #30291d; padding-bottom:5px; margin-bottom:6px;}}
+    .terminal-muted {{font-size:9px;color:#858d99;}}
+    .terminal-big {{font-size:18px;font-weight:700;color:#e5ad18;}}
+    .terminal-green {{color:#26a69a;font-weight:700;}}
+    .terminal-red {{color:#ef5350;font-weight:700;}}
+    .terminal-mini {{font-size:10px;color:#c4cad2;}}
+    hr {{border-color:#292e36 !important;}}
 </style>
 """, unsafe_allow_html=True)
 
@@ -608,7 +569,7 @@ with header_col:
             <div style="display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 15px; font-weight: bold;">⬛ {display_symbol}</span>
                 <span style="background-color: #2b313a; color: #f0b90b; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Demo Trading</span>
-                <span style="background-color: #1e232a; color: #848e9c; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Perp</span>
+                <span style="background-color: #1e232a; color: #848e9c; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Spot</span>
             </div>
             <div style="display: flex; gap: 14px; font-size: 11px;">
                 <div><span style="color: #848e9c;">최근가</span><br><span class="{change_class}" style="font-size: 13px;">${current_price:,.2f}</span></div>
@@ -693,9 +654,9 @@ with tf_cols[7]:
 
 # --- 🔥 지표 토글 버튼 (켜지면 골드/주황 불빛 들어옴) ---
 indicators = [
-    ("20일선", "show_ma20", 8),
-    ("50일선", "show_ma50", 9),
-    ("200일선", "show_ma200", 10),
+    ("MA20", "show_ma20", 8),
+    ("MA50", "show_ma50", 9),
+    ("MA200", "show_ma200", 10),
     ("EMA20", "show_ema20", 11),
     ("볼린저", "show_bollinger", 12),
     ("거래량", "show_volume", 13),
@@ -712,7 +673,7 @@ for label, key, col_idx in indicators:
             st.rerun()
 
 # --- 3. 메인 2컬럼 레이아웃 (차트 | 주문 패널) ---
-chart_col, trade_col = st.columns([7.8, 2.2])
+chart_col, trade_col = st.columns([2.0, 1.0])
 
 # --- [LEFT: 차트 패널] ---
 with chart_col:
@@ -732,20 +693,6 @@ with chart_col:
     df['MA50'] = df['close'].rolling(window=50).mean()
     df['MA200'] = df['close'].rolling(window=200).mean()
     df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
-
-    # 선택한 차트 주기와 별개로 실제 일봉 기준 20/50/200일 이동평균선을 계산
-    try:
-        daily_ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe="1d", limit=250)
-        daily_df = pd.DataFrame(daily_ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
-        daily_df["day"] = pd.to_datetime(daily_df["timestamp"], unit="ms").dt.date
-        for period in (20, 50, 200):
-            daily_col = f"MA{period}D"
-            daily_df[daily_col] = daily_df["close"].rolling(window=period).mean()
-            daily_values = daily_df.set_index("day")[daily_col]
-            df[daily_col] = df["datetime"].dt.date.map(daily_values)
-    except Exception:
-        for period in (20, 50, 200):
-            df[f"MA{period}D"] = float("nan")
 
     std20 = df['close'].rolling(window=20).std()
     df['BB_Upper'] = df['MA20'] + (std20 * 2)
@@ -794,11 +741,11 @@ with chart_col:
 
     # 지표 온/오프 반영
     if st.session_state.show_ma20:
-        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20D'], line=dict(color='#ff9800', width=1.7), name='20일선'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20'], line=dict(color='#f0b90b', width=1.5), name='MA20'), row=1, col=1)
     if st.session_state.show_ma50:
-        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA50D'], line=dict(color='#2196f3', width=1.7), name='50일선'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA50'], line=dict(color='#32a8e0', width=1.5), name='MA50'), row=1, col=1)
     if st.session_state.show_ma200:
-        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA200D'], line=dict(color='#9c27b0', width=1.7), name='200일선'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA200'], line=dict(color='#b05de8', width=1.5), name='MA200'), row=1, col=1)
     if st.session_state.show_ema20:
         fig.add_trace(go.Scatter(x=df['datetime'], y=df['EMA20'], line=dict(color='#00e676', width=1.5), name='EMA20'), row=1, col=1)
     if st.session_state.show_bollinger:
@@ -832,82 +779,100 @@ with chart_col:
         fig.add_trace(go.Bar(x=df['datetime'], y=df['MACD_Hist'], marker_color=hist_colors, name='Hist'), row=curr_row, col=1)
 
     fig.update_layout(
-        paper_bgcolor=card_bg,
-        plot_bgcolor=card_bg,
-        font=dict(color=text_color, size=11),
-        height=430,
-        margin=dict(l=10, r=60, t=15, b=15),
+        paper_bgcolor="#080a0e",
+        plot_bgcolor="#080a0e",
+        font=dict(color="#9ba4b2", size=9, family="Arial, sans-serif"),
+        height=500,
+        margin=dict(l=5, r=45, t=24, b=22),
         xaxis_rangeslider_visible=False,
         showlegend=False,
         hovermode="x unified",
         dragmode='pan'
     )
 
-    fig.update_yaxes(side="right", gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True, fixedrange=False)
-    fig.update_xaxes(gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True, fixedrange=False)
+    fig.update_yaxes(side="right", gridcolor="#1d222b", zerolinecolor="#1d222b", showgrid=True, fixedrange=False, tickfont=dict(size=9,color="#858d99"))
+    fig.update_xaxes(gridcolor="#171c24", zerolinecolor="#171c24", showgrid=True, fixedrange=False, tickfont=dict(size=9,color="#858d99"))
 
     st.plotly_chart(
         fig,
         use_container_width=True,
         config={
             'scrollZoom': True,
-            'displayModeBar': True,
-            'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
-            'displaylogo': False
+            'displayModeBar': False,
+            'displaylogo': False,
+            'responsive': True
         }
     )
-    st.caption("20일선·50일선·200일선은 실제 1일봉 기준 이동평균입니다. EMA20은 선택한 차트 주기 기준입니다.")
+    st.caption("MA20·MA50·MA200·EMA20은 선택한 차트 주기의 봉 기준입니다.")
 
-# --- [RIGHT: 주문 패널 카드] ---
+# --- [RIGHT: 주문 패널 + 계좌 상태] ---
 with trade_col:
-    st.markdown(f"<div style='font-weight: bold; font-size: 13px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid {border_color};'>⚡ Trade Panel</div>", unsafe_allow_html=True)
-    
-    leverage = st.slider("🎯 레버리지 배율 (1x ~ 50x)", min_value=1, max_value=50, value=10, step=1)
-    order_mode = st.radio("주문 타입", ["지정가 (Limit)", "시장가 (Market)"], horizontal=True)
-    
-    limit_price = st.number_input("지정가 (USDT)", value=float(current_price), step=10.0, key="limit_price_input")
+    btc_value = btc_balance * current_price
+    st.markdown(f"""
+    <div class="terminal-card">
+      <div class="terminal-card-title">▣ 계좌 현황 <span style="float:right;color:#858d99">DEMO · SPOT</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div><div class="terminal-muted">총 평가 자산</div><div class="terminal-big">{total_asset_usdt:,.2f} <span style="font-size:10px">USDT</span></div></div>
+        <div style="text-align:right"><div class="terminal-muted">24H 변동</div><div class="{'terminal-green' if change_24h >= 0 else 'terminal-red'}">{change_24h:+.2f}%</div></div>
+      </div>
+      <hr style="margin:6px 0">
+      <div style="display:flex;justify-content:space-between" class="terminal-mini"><span>USDT</span><b>{usdt_balance:,.2f}</b></div>
+      <div style="display:flex;justify-content:space-between" class="terminal-mini"><span>BTC 평가액</span><b>{btc_value:,.2f} USDT</b></div>
+      <div class="terminal-muted" style="margin-top:5px">현물 데모 계좌 · 레버리지/숏 포지션 아님</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    trade_tab1, trade_tab2 = st.tabs(["🟢 Buy / Long", "🔴 Sell / Short"])
-    
+    st.markdown('<div class="terminal-card-title">▣ 주문 입력</div>', unsafe_allow_html=True)
+    order_mode = st.radio("주문 방식", ["지정가", "시장가"], horizontal=True, label_visibility="collapsed", key="spot_order_mode")
+    limit_price = st.number_input("지정가 · USDT", value=float(current_price), step=10.0, key="limit_price_input")
+    trade_tab1, trade_tab2 = st.tabs(["🟢 매수", "🔴 매도"])
+
     with trade_tab1:
-        buy_percent = st.slider("USDT 매수 비중 (%)", 10, 100, 25, 5, key="b_percent")
-        if st.button(f"🚀 {leverage}x Long 매수 실행", use_container_width=True, type="primary"):
+        buy_percent = st.slider("USDT 매수 비중", 10, 100, 25, 5, key="b_percent")
+        st.caption(f"주문 예상액 · {usdt_balance * buy_percent / 100:,.2f} USDT")
+        if st.button("매수 주문 실행", use_container_width=True, type="primary", key="spot_buy_submit"):
             try:
-                buy_usdt_amount = usdt_balance * (buy_percent / 100) * leverage
-                buy_btc_amount = buy_usdt_amount / (limit_price if "지정가" in order_mode else current_price)
-                
-                if "시장가" in order_mode:
+                buy_usdt_amount = usdt_balance * (buy_percent / 100)
+                buy_btc_amount = buy_usdt_amount / (limit_price if order_mode == "지정가" else current_price)
+                if order_mode == "시장가":
                     order = exchange.create_market_buy_order(ccxt_symbol, buy_btc_amount)
                 else:
                     order = exchange.create_limit_buy_order(ccxt_symbol, buy_btc_amount, limit_price)
-                st.success(f"✅ 매수 성공! ID: {order['id']}")
+                st.success(f"매수 주문 접수 · ID: {order['id']}")
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"❌ 매수 실패: {e}")
+                st.error(f"매수 주문 실패: {e}")
 
     with trade_tab2:
-        sell_percent = st.slider("BTC 매도 비중 (%)", 10, 100, 100, 5, key="s_percent")
-        if st.button(f"📉 {leverage}x Short 매도 실행", use_container_width=True):
+        sell_percent = st.slider("BTC 매도 비중", 10, 100, 100, 5, key="s_percent")
+        st.caption(f"보유 BTC · {btc_balance:.6f} BTC")
+        if st.button("매도 주문 실행", use_container_width=True, key="spot_sell_submit"):
             try:
                 sell_btc_amount = btc_balance * (sell_percent / 100)
-                
-                if "시장가" in order_mode:
+                if order_mode == "시장가":
                     order = exchange.create_market_sell_order(ccxt_symbol, sell_btc_amount)
                 else:
                     order = exchange.create_limit_sell_order(ccxt_symbol, sell_btc_amount, limit_price)
-                st.success(f"✅ 매도 성공! ID: {order['id']}")
+                st.success(f"매도 주문 접수 · ID: {order['id']}")
                 time.sleep(1)
                 st.rerun()
             except Exception as e:
-                st.error(f"❌ 매도 실패: {e}")
+                st.error(f"매도 주문 실패: {e}")
 
-st.divider()
+    st.markdown(f"""
+    <div class="terminal-card">
+      <div class="terminal-card-title">▣ BTC 보유 요약</div>
+      <div class="terminal-mini">보유 수량 <b style="float:right">{btc_balance:.6f} BTC</b></div>
+      <div class="terminal-mini" style="margin-top:5px">현재 평가액 <b style="float:right">{btc_value:,.2f} USDT</b></div>
+      <div class="terminal-muted" style="margin-top:6px">평균 매입가 자료가 없어 미실현 손익은 표시하지 않습니다.</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.divider()
 
 # --- 5. 하단 탭: Orders & Assets ---
-st.subheader("📋 Orders & Account History")
+st.subheader("📋 주문 · 자산 내역")
 
 tab_open, tab_hist, tab_asset = st.tabs(["⏳ 미체결 주문 (Open Orders)", "📜 체결 히스토리 (Order History)", "💼 자산 잔고 (Assets)"])
 
