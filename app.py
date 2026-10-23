@@ -625,6 +625,88 @@ if st.session_state.ai_result:
     st.markdown(f"**💡 AI 판단 근거:**\n>{reason}")
     st.markdown(f"**📊 권장 매매 비중:** `{percentage}%`")
 
+    def render_analysis_detail():
+        st.caption(f"{display_symbol} · {timeframe} · 최근 {len(df)}개 캔들 기준")
+
+        # 기존 차트를 축소해 상세 분석 창 안에 표시
+        mini_chart = go.Figure(fig)
+        mini_chart.update_layout(
+            height=320,
+            margin=dict(l=5, r=45, t=8, b=5),
+            showlegend=False,
+            paper_bgcolor=card_bg,
+            plot_bgcolor=card_bg,
+            font=dict(color=text_color, size=9),
+        )
+        st.plotly_chart(mini_chart, use_container_width=True, config={"displayModeBar": False})
+
+        st.markdown("#### AI 판단 요약")
+        st.write(reason or "AI가 별도의 판단 근거를 반환하지 않았습니다.")
+        st.caption(f"추천 방향: {decision} · 권장 비중: {percentage}%")
+
+        st.markdown("#### 판단에 참고할 수 있는 지표")
+        latest = df.iloc[-1]
+        close = float(latest["close"])
+        checks = []
+
+        for ma_name in ("MA20", "MA50", "MA200", "EMA20"):
+            value = latest.get(ma_name)
+            if pd.notna(value):
+                direction = "위" if close >= float(value) else "아래"
+                checks.append(f"- **{ma_name}:** 종가가 이동평균선 {direction}에 있습니다 (선 값 {float(value):,.2f}).")
+
+        rsi_value = latest.get("RSI")
+        if pd.notna(rsi_value):
+            rsi_value = float(rsi_value)
+            if rsi_value >= 70:
+                rsi_comment = "과매수 구간에 가까워 추격 매수에 주의할 수 있습니다."
+            elif rsi_value <= 30:
+                rsi_comment = "과매도 구간에 가까워 반등 여부를 확인할 수 있습니다."
+            else:
+                rsi_comment = "중립 범위입니다. 다른 지표와 함께 확인해야 합니다."
+            checks.append(f"- **RSI(14):** {rsi_value:.1f} — {rsi_comment}")
+
+        macd_value = latest.get("MACD")
+        signal_value = latest.get("MACD_Signal")
+        if pd.notna(macd_value) and pd.notna(signal_value):
+            macd_text = "MACD가 시그널선 위" if float(macd_value) >= float(signal_value) else "MACD가 시그널선 아래"
+            checks.append(f"- **MACD:** {macd_text}입니다 (MACD {float(macd_value):.2f}, 시그널 {float(signal_value):.2f}).")
+
+        upper = latest.get("BB_Upper")
+        lower = latest.get("BB_Lower")
+        if pd.notna(upper) and pd.notna(lower):
+            if close > float(upper):
+                bb_text = "상단 밴드 위로 올라와 변동성이 커졌을 수 있습니다."
+            elif close < float(lower):
+                bb_text = "하단 밴드 아래에 있어 반등 여부와 추가 하락 위험을 함께 확인해야 합니다."
+            else:
+                bb_text = "밴드 안쪽에서 움직이고 있습니다."
+            checks.append(f"- **볼린저 밴드:** {bb_text}")
+
+        if len(df) >= 2:
+            avg_volume = df["volume"].iloc[-21:-1].mean()
+            current_volume = float(latest["volume"])
+            if pd.notna(avg_volume) and avg_volume > 0:
+                checks.append(f"- **거래량:** 마지막 캔들 {current_volume:,.4f} BTC / 직전 평균 {float(avg_volume):,.4f} BTC.")
+
+        if checks:
+            st.markdown("\n".join(checks))
+        else:
+            st.info("표시할 지표 데이터가 충분하지 않습니다.")
+
+        st.caption("이 지표 설명은 참고용이며, 매매 신호나 수익을 보장하지 않습니다.")
+
+    if hasattr(st, "dialog"):
+        @st.dialog("📊 AI 분석 차트와 판단 논리")
+        def show_analysis_dialog():
+            render_analysis_detail()
+
+        if st.button("📊 분석 차트와 판단 논리 자세히 보기", use_container_width=True):
+            show_analysis_dialog()
+    else:
+        with st.expander("📊 분석 차트와 판단 논리 자세히 보기", expanded=False):
+            render_analysis_detail()
+
 st.divider()
 
 # --- 5. 하단 탭: Orders & Assets ---
