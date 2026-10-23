@@ -32,6 +32,12 @@ if "active_tf" not in st.session_state:
 if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
 
+if "app_view" not in st.session_state:
+    st.session_state.app_view = "trade"
+
+if "ai_result_timeframe" not in st.session_state:
+    st.session_state.ai_result_timeframe = None
+
 # 지표 토글 세션 상태 초기화
 default_defaults = {
     'show_ma20': True,
@@ -225,6 +231,277 @@ try:
 
 except Exception as e:
     st.error(f"거래소 데이터 로드 실패: {e}")
+    st.stop()
+
+# --- 화면 전환: 매매 화면 / AI 분석 차트실 ---
+nav_left, nav_right = st.columns([1, 1])
+with nav_left:
+    if st.button("📈 매매 화면", type="primary" if st.session_state.app_view == "trade" else "secondary", use_container_width=True, key="nav_trade"):
+        st.session_state.app_view = "trade"
+        st.rerun()
+with nav_right:
+    if st.button("🤖 AI 분석 차트실", type="primary" if st.session_state.app_view == "analysis" else "secondary", use_container_width=True, key="nav_analysis"):
+        st.session_state.app_view = "analysis"
+        st.rerun()
+
+if st.session_state.app_view == "analysis":
+    st.title("🤖 AI 분석 차트실")
+    st.caption("차트 분석과 판단 근거는 이 화면에서 확인하고, 실제 주문은 ‘매매 화면’에서 진행하세요.")
+
+    analysis_tf_options = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "2d", "3d"]
+    if st.session_state.active_tf not in analysis_tf_options:
+        st.session_state.active_tf = "5m"
+    analysis_tf = st.selectbox(
+        "분석 타임프레임",
+        analysis_tf_options,
+        index=analysis_tf_options.index(st.session_state.active_tf),
+        key="analysis_tf_select",
+    )
+    st.session_state.active_tf = analysis_tf
+
+    try:
+        analysis_ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe=analysis_tf, limit=150)
+        analysis_df = pd.DataFrame(
+            analysis_ohlcv,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+        analysis_df["datetime"] = pd.to_datetime(analysis_df["timestamp"], unit="ms")
+        analysis_df["MA20"] = analysis_df["close"].rolling(window=20).mean()
+        analysis_df["MA50"] = analysis_df["close"].rolling(window=50).mean()
+        analysis_df["EMA20"] = analysis_df["close"].ewm(span=20, adjust=False).mean()
+        std20 = analysis_df["close"].rolling(window=20).std()
+        analysis_df["BB_Upper"] = analysis_df["MA20"] + 2 * std20
+        analysis_df["BB_Lower"] = analysis_df["MA20"] - 2 * std20
+
+        delta = analysis_df["close"].diff()
+        gain = delta.where(delta > 0, 0).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        analysis_df["RSI"] = 100 - (100 / (1 + rs))
+        ema12 = analysis_df["close"].ewm(span=12, adjust=False).mean()
+        ema26 = analysis_df["close"].ewm(span=26, adjust=False).mean()
+        analysis_df["MACD"] = ema12 - ema26
+        analysis_df["MACD_Signal"] = analysis_df["MACD"].ewm(span=9, adjust=False).mean()
+        analysis_df["MACD_Hist"] = analysis_df["MACD"] - analysis_df["MACD_Signal"]
+
+        analysis_fig = make_subplots(
+            rows=4,
+            cols=1,
+            shared_xaxes=True,
+            vertical_spacing=0.025,
+            row_heights=[0.58, 0.14, 0.14, 0.14],
+            subplot_titles=("BTC/USDT · 가격 및 추세", "거래량", "RSI (14)", "MACD (12, 26, 9)"),
+        )
+        analysis_fig.add_trace(
+            go.Candlestick(
+                x=analysis_df["datetime"],
+                open=analysis_df["open"],
+                high=analysis_df["high"],
+                low=analysis_df["low"],
+                close=analysis_df["close"],
+                name="BTC/USDT",
+                increasing_line_color="#26a69a",
+                increasing_fillcolor="#26a69a",
+                decreasing_line_color="#ef5350",
+                decreasing_fillcolor="#ef5350",
+            ),
+            row=1,
+            col=1,
+        )
+        for name, color in (("MA20", "#ff9800"), ("MA50", "#2196f3"), ("EMA20", "#00a86b")):
+            analysis_fig.add_trace(
+                go.Scatter(x=analysis_df["datetime"], y=analysis_df[name], name=name, line=dict(color=color, width=1.3)),
+                row=1,
+                col=1,
+            )
+        analysis_fig.add_trace(
+            go.Scatter(x=analysis_df["datetime"], y=analysis_df["BB_Upper"], name="볼린저 상단", line=dict(color="#7e57c2", width=1, dash="dot")),
+            row=1,
+            col=1,
+        )
+        analysis_fig.add_trace(
+            go.Scatter(x=analysis_df["datetime"], y=analysis_df["BB_Lower"], name="볼린저 하단", line=dict(color="#7e57c2", width=1, dash="dot")),
+            row=1,
+            col=1,
+        )
+        vol_colors = ["#26a69a" if c >= o else "#ef5350" for c, o in zip(analysis_df["close"], analysis_df["open"])]
+        analysis_fig.add_trace(
+            go.Bar(x=analysis_df["datetime"], y=analysis_df["volume"], marker_color=vol_colors, name="거래량"),
+            row=2,
+            col=1,
+        )
+        analysis_fig.add_trace(
+            go.Scatter(x=analysis_df["datetime"], y=analysis_df["RSI"], name="RSI", line=dict(color="#f0b90b", width=1.3)),
+            row=3,
+            col=1,
+        )
+        analysis_fig.add_hline(y=70, line_dash="dash", line_color="#ef5350", row=3, col=1)
+        analysis_fig.add_hline(y=30, line_dash="dash", line_color="#26a69a", row=3, col=1)
+        analysis_fig.add_trace(
+            go.Scatter(x=analysis_df["datetime"], y=analysis_df["MACD"], name="MACD", line=dict(color="#2196f3", width=1.2)),
+            row=4,
+            col=1,
+        )
+        analysis_fig.add_trace(
+            go.Scatter(x=analysis_df["datetime"], y=analysis_df["MACD_Signal"], name="Signal", line=dict(color="#ff9800", width=1.2)),
+            row=4,
+            col=1,
+        )
+        macd_colors = ["#26a69a" if value >= 0 else "#ef5350" for value in analysis_df["MACD_Hist"].fillna(0)]
+        analysis_fig.add_trace(
+            go.Bar(x=analysis_df["datetime"], y=analysis_df["MACD_Hist"], marker_color=macd_colors, name="MACD 히스토그램"),
+            row=4,
+            col=1,
+        )
+        analysis_fig.update_layout(
+            paper_bgcolor=card_bg,
+            plot_bgcolor=card_bg,
+            font=dict(color=text_color, size=10),
+            height=690,
+            margin=dict(l=10, r=55, t=35, b=10),
+            xaxis_rangeslider_visible=False,
+            hovermode="x unified",
+            legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
+        )
+        analysis_fig.update_yaxes(side="right", gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True)
+        analysis_fig.update_xaxes(gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True)
+        st.plotly_chart(analysis_fig, use_container_width=True, config={"scrollZoom": True, "displaylogo": False})
+
+        latest = analysis_df.iloc[-1]
+        metric_cols = st.columns(4)
+        metric_cols[0].metric("최근가", f"${float(latest['close']):,.2f}")
+        metric_cols[1].metric("RSI(14)", f"{float(latest['RSI']):.1f}" if pd.notna(latest["RSI"]) else "계산 중")
+        metric_cols[2].metric("MACD", f"{float(latest['MACD']):.2f}" if pd.notna(latest["MACD"]) else "계산 중")
+        metric_cols[3].metric("타임프레임", analysis_tf)
+
+        if st.button("🔍 이 차트 AI 분석하기", type="primary", use_container_width=True, key="run_room_analysis"):
+            with st.status("🤖 분석 차트실에서 시장 데이터를 분석 중입니다...", expanded=True) as status:
+                try:
+                    last_candles = [
+                        {"open": c[1], "high": c[2], "low": c[3], "close": c[4], "volume": c[5]}
+                        for c in analysis_ohlcv[-20:]
+                    ]
+                    indicators_snapshot = {
+                        "MA20": None if pd.isna(latest["MA20"]) else float(latest["MA20"]),
+                        "MA50": None if pd.isna(latest["MA50"]) else float(latest["MA50"]),
+                        "EMA20": None if pd.isna(latest["EMA20"]) else float(latest["EMA20"]),
+                        "RSI14": None if pd.isna(latest["RSI"]) else float(latest["RSI"]),
+                        "MACD": None if pd.isna(latest["MACD"]) else float(latest["MACD"]),
+                        "MACD_signal": None if pd.isna(latest["MACD_Signal"]) else float(latest["MACD_Signal"]),
+                        "bollinger_upper": None if pd.isna(latest["BB_Upper"]) else float(latest["BB_Upper"]),
+                        "bollinger_lower": None if pd.isna(latest["BB_Lower"]) else float(latest["BB_Lower"]),
+                    }
+                    analysis_payload = {
+                        "symbol": display_symbol,
+                        "timeframe": analysis_tf,
+                        "current_price": current_price,
+                        "balances": {"USDT": usdt_balance, "BTC": btc_balance},
+                        "latest_indicators": indicators_snapshot,
+                        "recent_candles": last_candles,
+                    }
+                    analysis_prompt = f"""
+당신은 신중한 시장 분석 도우미입니다. 아래 자료를 분석하되 수익을 보장하거나 확정적인 표현을 하지 마세요.
+추세, 거래량, RSI, MACD, 볼린저 밴드의 근거와 서로 상충하는 신호를 한국어로 설명하세요.
+판단은 buy, sell, hold 중 하나로 하고, 불확실하면 hold를 선택하세요.
+응답은 JSON만 반환하세요: {{"decision":"buy|sell|hold","reason":"한국어 분석 논리","percentage":0}}
+시장 자료:
+{json.dumps(analysis_payload, ensure_ascii=False, indent=2)}
+"""
+                    raw_text = None
+                    if ai_client:
+                        try:
+                            status.write("🧠 Gemini 분석 요청 중...")
+                            ai_response = ai_client.models.generate_content(model="gemini-3.8-flash", contents=analysis_prompt)
+                            raw_text = ai_response.text
+                        except Exception as ai_error:
+                            status.write(f"⏳ Gemini 요청 실패, OpenRouter로 전환합니다: {ai_error}")
+
+                    if not raw_text and openrouter_key:
+                        headers = {
+                            "Authorization": f"Bearer {openrouter_key.strip()}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://streamlit.io",
+                            "X-Title": "OKX AI Analysis Room",
+                        }
+                        for model_slug in ["openrouter/free", "google/gemma-4-31b-it:free", "qwen/qwen3.8-27b:free"]:
+                            status.write(f"🧠 OpenRouter 분석 요청 중: {model_slug}")
+                            try:
+                                response = requests.post(
+                                    "https://openrouter.ai/api/v1/chat/completions",
+                                    headers=headers,
+                                    json={"model": model_slug, "messages": [{"role": "user", "content": analysis_prompt}]},
+                                    timeout=20,
+                                )
+                                response.raise_for_status()
+                                response_json = response.json()
+                                if response_json.get("choices"):
+                                    raw_text = response_json["choices"][0]["message"]["content"]
+                                    break
+                            except Exception:
+                                continue
+                    if not raw_text:
+                        raise RuntimeError("AI 연결에 실패했습니다. API 키 또는 네트워크 설정을 확인해주세요.")
+
+                    clean_text = re.sub(r"<think>.*?</think>", "", raw_text, flags=re.DOTALL).strip()
+                    json_match = re.search(r"\{.*\}", clean_text, re.DOTALL)
+                    if json_match:
+                        parsed_result = json.loads(json_match.group(0))
+                    else:
+                        clean_text = clean_text.replace("```json", "").replace("```", "").strip()
+                        parsed_result = json.loads(clean_text)
+                    st.session_state.ai_result = parsed_result
+                    st.session_state.ai_result_timeframe = analysis_tf
+                    status.update(label="✅ 분석 완료", state="complete", expanded=False)
+                except Exception as error:
+                    status.update(label="❌ 분석 실패", state="error", expanded=True)
+                    st.error(f"분석 중 오류가 발생했습니다: {error}")
+
+        if st.session_state.ai_result:
+            result = st.session_state.ai_result
+            decision = str(result.get("decision", "hold")).upper()
+            reason = result.get("reason", "분석 근거가 반환되지 않았습니다.")
+            percentage = result.get("percentage", 0)
+            st.markdown("---")
+            st.subheader("🧠 AI 분석 결과와 판단 논리")
+            if decision == "BUY":
+                st.success(f"AI 의견: 🟢 {decision} · 권장 비중 {percentage}%")
+            elif decision == "SELL":
+                st.warning(f"AI 의견: 🔴 {decision} · 권장 비중 {percentage}%")
+            else:
+                st.info(f"AI 의견: 🟡 {decision} · 권장 비중 {percentage}%")
+            if st.session_state.ai_result_timeframe:
+                st.caption(f"분석 당시 타임프레임: {st.session_state.ai_result_timeframe}")
+            st.markdown(f"**AI 판단 근거**\n\n{reason}")
+
+            st.markdown("#### 지표를 읽는 기준")
+            logic_lines = []
+            close_value = float(latest["close"])
+            for ma_name in ("MA20", "MA50", "EMA20"):
+                ma_value = latest[ma_name]
+                if pd.notna(ma_value):
+                    relation = "위" if close_value >= float(ma_value) else "아래"
+                    logic_lines.append(f"- 종가는 **{ma_name} {relation}**입니다 ({float(ma_value):,.2f}).")
+            if pd.notna(latest["RSI"]):
+                rsi_value = float(latest["RSI"])
+                rsi_text = "과매수 주의 구간" if rsi_value >= 70 else "과매도 주의 구간" if rsi_value <= 30 else "중립 구간"
+                logic_lines.append(f"- **RSI {rsi_value:.1f}:** {rsi_text}. RSI 하나만으로 매수·매도를 결정하지 않습니다.")
+            if pd.notna(latest["MACD"]) and pd.notna(latest["MACD_Signal"]):
+                macd_relation = "시그널선 위" if float(latest["MACD"]) >= float(latest["MACD_Signal"]) else "시그널선 아래"
+                logic_lines.append(f"- **MACD:** 현재 MACD가 시그널선 {macd_relation}에 있습니다.")
+            if pd.notna(latest["BB_Upper"]) and pd.notna(latest["BB_Lower"]):
+                if close_value > float(latest["BB_Upper"]):
+                    band_text = "상단 밴드 밖이며 변동성 확대 가능성을 확인해야 합니다."
+                elif close_value < float(latest["BB_Lower"]):
+                    band_text = "하단 밴드 밖이며 추가 하락 및 반등 가능성을 함께 확인해야 합니다."
+                else:
+                    band_text = "가격이 밴드 안에 있습니다."
+                logic_lines.append(f"- **볼린저 밴드:** {band_text}")
+            st.markdown("\n".join(logic_lines))
+            st.caption("AI 의견과 기술 지표는 참고용입니다. 자동 주문을 실행하지 않으며 수익을 보장하지 않습니다.")
+
+    except Exception as error:
+        st.error(f"분석 차트 데이터를 불러오지 못했습니다: {error}")
+
     st.stop()
 
 # --- 1. Top Header Bar & 설정(다크모드) 창 ---
@@ -520,192 +797,6 @@ with trade_col:
                 st.error(f"❌ 매도 실패: {e}")
 
 st.divider()
-
-# --- 4. AI 분석 및 판단 섹션 ---
-st.subheader("🤖 AI 차트 분석 및 추천 엔진")
-
-if st.button("🔍 AI 차트 분석 시작하기 (Gemini / OpenRouter)", type="primary", use_container_width=True):
-    with st.status("🤖 AI가 OKX 실시간 차트 데이터를 분석 중입니다...", expanded=True) as status:
-        try:
-            status.write("📊 1. 선택된 타임프레임 시세 수집 중...")
-            market_data = {
-                "symbol": display_symbol,
-                "timeframe": timeframe,
-                "current_price": current_price,
-                "leverage": leverage,
-                "usdt_balance": usdt_balance,
-                "btc_balance": btc_balance,
-                "recent_candles": [
-                    {"open": c[1], "high": c[2], "low": c[3], "close": c[4], "volume": c[5]}
-                    for c in ohlcv[-15:]
-                ]
-            }
-
-            prompt = f"""
-            당신은 신중하고 전문적인 암호화폐 트레이더입니다.
-            아래 전달된 실시간 시장 데이터와 잔고 상태를 분석하여 매매 전략을 결정하세요.
-
-            [시장 데이터]
-            {json.dumps(market_data, indent=2)}
-
-            [분석 규칙]
-            1. 모든 분석 이유("reason")와 판단 설명은 반드시 100% 한국어(한글)로만 작성해야 합니다.
-            2. 추세와 거래량을 고려하여 확실한 매수 타점일 때만 "buy", 매도 타점일 때 "sell", 불확실하면 "hold"를 선택하세요.
-            3. 응답은 오직 아래 지정된 JSON 양식으로만 응답해야 합니다. 다른 설명은 금지합니다.
-
-            {{
-                "decision": "buy" 또는 "sell" 또는 "hold",
-                "reason": "기술적 분석에 기반한 구체적인 한국어 판단 이유",
-                "percentage": 10~100 사이의 권장 주문 비중 (hold인 경우 0)
-            }}
-            """
-
-            raw_text = None
-
-            if ai_client:
-                try:
-                    status.write("🧠 1. Gemini Flash 모델 분석 시도 중...")
-                    res = ai_client.models.generate_content(model='gemini-3.8-flash', contents=prompt)
-                    raw_text = res.text
-                except Exception:
-                    status.write("⏳ Gemini 한도 소진/대기. OpenRouter 무료 AI 모음으로 우회합니다.")
-
-            if not raw_text and openrouter_key:
-                free_models = ["openrouter/free", "google/gemma-4-31b-it:free", "qwen/qwen3.8-27b:free"]
-                headers = {
-                    "Authorization": f"Bearer {openrouter_key.strip()}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://streamlit.io",
-                    "X-Title": "OKX AI Trading Pro"
-                }
-
-                for model_slug in free_models:
-                    status.write(f"🧠 OpenRouter 모델({model_slug})에 분석 요청 중...")
-                    payload = {"model": model_slug, "messages": [{"role": "user", "content": prompt}]}
-                    try:
-                        res = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=15)
-                        res_json = res.json()
-                        if "choices" in res_json and len(res_json["choices"]) > 0:
-                            raw_text = res_json["choices"][0]["message"]["content"]
-                            break
-                    except Exception:
-                        continue
-
-            if not raw_text:
-                raise Exception("모든 AI 모델 연결에 실패했습니다. 키 설정을 확인해주세요.")
-
-            clean_text = re.sub(r'<think>.*?</think>', '', raw_text, flags=re.DOTALL)
-            json_match = re.search(r'\{.*\}', clean_text, re.DOTALL)
-            
-            if json_match:
-                st.session_state.ai_result = json.loads(json_match.group(0))
-            else:
-                clean_text = clean_text.replace("```json", "").replace("```", "").strip()
-                st.session_state.ai_result = json.loads(clean_text)
-
-            status.update(label="✅ AI 차트 분석 완료!", state="complete", expanded=False)
-
-        except Exception as e:
-            status.update(label="❌ AI 분석 실패", state="error", expanded=True)
-            st.error(f"오류 상세 내용: {e}")
-
-if st.session_state.ai_result:
-    result = st.session_state.ai_result
-    decision = str(result.get("decision", "hold")).upper()
-    reason = result.get("reason", "")
-    percentage = result.get("percentage", 0)
-
-    if decision == "BUY":
-        st.success(f"### AI 추천: 🟢 {decision} (매수 추천)")
-    elif decision == "SELL":
-        st.warning(f"### AI 추천: 🔴 {decision} (매도 추천)")
-    else:
-        st.info(f"### AI 추천: 🟡 {decision} (관망 추천)")
-
-    st.markdown(f"**💡 AI 판단 근거:**\n>{reason}")
-    st.markdown(f"**📊 권장 매매 비중:** `{percentage}%`")
-
-    def render_analysis_detail():
-        st.caption(f"{display_symbol} · {timeframe} · 최근 {len(df)}개 캔들 기준")
-
-        # 기존 차트를 축소해 상세 분석 창 안에 표시
-        mini_chart = go.Figure(fig)
-        mini_chart.update_layout(
-            height=320,
-            margin=dict(l=5, r=45, t=8, b=5),
-            showlegend=False,
-            paper_bgcolor=card_bg,
-            plot_bgcolor=card_bg,
-            font=dict(color=text_color, size=9),
-        )
-        st.plotly_chart(mini_chart, use_container_width=True, config={"displayModeBar": False})
-
-        st.markdown("#### AI 판단 요약")
-        st.write(reason or "AI가 별도의 판단 근거를 반환하지 않았습니다.")
-        st.caption(f"추천 방향: {decision} · 권장 비중: {percentage}%")
-
-        st.markdown("#### 판단에 참고할 수 있는 지표")
-        latest = df.iloc[-1]
-        close = float(latest["close"])
-        checks = []
-
-        for ma_name in ("MA20", "MA50", "MA200", "EMA20"):
-            value = latest.get(ma_name)
-            if pd.notna(value):
-                direction = "위" if close >= float(value) else "아래"
-                checks.append(f"- **{ma_name}:** 종가가 이동평균선 {direction}에 있습니다 (선 값 {float(value):,.2f}).")
-
-        rsi_value = latest.get("RSI")
-        if pd.notna(rsi_value):
-            rsi_value = float(rsi_value)
-            if rsi_value >= 70:
-                rsi_comment = "과매수 구간에 가까워 추격 매수에 주의할 수 있습니다."
-            elif rsi_value <= 30:
-                rsi_comment = "과매도 구간에 가까워 반등 여부를 확인할 수 있습니다."
-            else:
-                rsi_comment = "중립 범위입니다. 다른 지표와 함께 확인해야 합니다."
-            checks.append(f"- **RSI(14):** {rsi_value:.1f} — {rsi_comment}")
-
-        macd_value = latest.get("MACD")
-        signal_value = latest.get("MACD_Signal")
-        if pd.notna(macd_value) and pd.notna(signal_value):
-            macd_text = "MACD가 시그널선 위" if float(macd_value) >= float(signal_value) else "MACD가 시그널선 아래"
-            checks.append(f"- **MACD:** {macd_text}입니다 (MACD {float(macd_value):.2f}, 시그널 {float(signal_value):.2f}).")
-
-        upper = latest.get("BB_Upper")
-        lower = latest.get("BB_Lower")
-        if pd.notna(upper) and pd.notna(lower):
-            if close > float(upper):
-                bb_text = "상단 밴드 위로 올라와 변동성이 커졌을 수 있습니다."
-            elif close < float(lower):
-                bb_text = "하단 밴드 아래에 있어 반등 여부와 추가 하락 위험을 함께 확인해야 합니다."
-            else:
-                bb_text = "밴드 안쪽에서 움직이고 있습니다."
-            checks.append(f"- **볼린저 밴드:** {bb_text}")
-
-        if len(df) >= 2:
-            avg_volume = df["volume"].iloc[-21:-1].mean()
-            current_volume = float(latest["volume"])
-            if pd.notna(avg_volume) and avg_volume > 0:
-                checks.append(f"- **거래량:** 마지막 캔들 {current_volume:,.4f} BTC / 직전 평균 {float(avg_volume):,.4f} BTC.")
-
-        if checks:
-            st.markdown("\n".join(checks))
-        else:
-            st.info("표시할 지표 데이터가 충분하지 않습니다.")
-
-        st.caption("이 지표 설명은 참고용이며, 매매 신호나 수익을 보장하지 않습니다.")
-
-    if hasattr(st, "dialog"):
-        @st.dialog("📊 AI 분석 차트와 판단 논리")
-        def show_analysis_dialog():
-            render_analysis_detail()
-
-        if st.button("📊 분석 차트와 판단 논리 자세히 보기", use_container_width=True):
-            show_analysis_dialog()
-    else:
-        with st.expander("📊 분석 차트와 판단 논리 자세히 보기", expanded=False):
-            render_analysis_detail()
 
 st.divider()
 
