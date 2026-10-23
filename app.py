@@ -313,7 +313,7 @@ with tf_cols[7]:
             if st.button("30m", key="pop_30m"): set_timeframe("30m"); st.rerun()
         with grid_r2[2]:
             if st.button("1h", key="pop_1h"): set_timeframe("1h"); st.rerun()
-        with grid_r3[3]:
+        with grid_r2[3]:
             if st.button("2h", key="pop_2h"): set_timeframe("2h"); st.rerun()
         with grid_r2[4]:
             if st.button("4h", key="pop_4h"): set_timeframe("4h"); st.rerun()
