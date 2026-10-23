@@ -27,22 +27,17 @@ if "theme_mode" not in st.session_state:
     st.session_state.theme_mode = "Dark (다크 모드)"
 
 if "active_tf" not in st.session_state:
-    st.session_state.active_tf = "1h"
+    st.session_state.active_tf = "5m"
 
 if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
 
-if "limit_price_val" not in st.session_state:
-    st.session_state.limit_price_val = 0.0
-
-# 동적 CSS 테마 색상 설정
-is_dark = "Dark" in st.session_state.theme_mode
-
-bg_color = "#000000" if is_dark else "#f4f5f8"
-card_bg = "#0e1217" if is_dark else "#ffffff"
-input_bg = "#1a1f26" if is_dark else "#ffffff"
-text_color = "#eaeaea" if is_dark else "#111827"
-border_color = "#282e38" if is_dark else "#e5e7eb"
+# 동적 CSS 테마 색상 설정 (TradingView Dark Theme)
+bg_color = "#000000"
+card_bg = "#000000"
+input_bg = "#131722"
+text_color = "#d1d4dc"
+border_color = "#2a2e39"
 
 st.markdown(f"""
 <style>
@@ -51,7 +46,7 @@ st.markdown(f"""
         display: none !important;
     }}
     
-    /* 2. 전체 메인 앱 배경 */
+    /* 2. 전체 메인 앱 배경 (TradingView 딥블랙) */
     .stApp, div[data-testid="stHeader"], div[data-testid="stToolbar"] {{
         background-color: {bg_color} !important;
         color: {text_color} !important;
@@ -59,24 +54,23 @@ st.markdown(f"""
 
     /* 3. 컬럼 레이아웃 간격 최적화 */
     div[data-testid="stHorizontalBlock"] {{
-        gap: 8px !important;
+        gap: 10px !important;
     }}
 
     /* 4. 영역 분리 카드 디자인 */
     div[data-testid="column"] > div {{
         background-color: {card_bg} !important;
         border: 1px solid {border_color} !important;
-        border-radius: 8px !important;
-        padding: 8px 10px !important;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+        border-radius: 4px !important;
+        padding: 8px 12px !important;
     }}
 
-    /* 5. 텍스트 글자색 다크 적용 */
+    /* 5. 텍스트 글자색 적용 */
     label, p, span, h1, h2, h3, h4, h5, h6, div[data-testid="stWidgetLabel"] {{
         color: {text_color} !important;
     }}
 
-    /* 6. 입력창, 넘버입력기, 선택박스 스타일 */
+    /* 6. 입력창, 선택박스 스타일 */
     div[data-baseweb="input"], 
     div[data-baseweb="input"] > div,
     div[data-baseweb="base-input"],
@@ -84,122 +78,35 @@ st.markdown(f"""
         background-color: {input_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
-        border-radius: 6px !important;
+        border-radius: 4px !important;
     }}
 
-    input[type="number"] {{
-        color: {text_color} !important;
-        background-color: {input_bg} !important;
-    }}
-    
-    button[aria-label="Decrease value"], button[aria-label="Increase value"] {{
-        background-color: {input_bg} !important;
-        color: {text_color} !important;
-        border-color: {border_color} !important;
-    }}
-
-    /* 7. 타임프레임 및 일반 슬림 버튼 */
+    /* 7. 타임프레임 및 버튼 스타일 */
     div.stButton > button {{
         background-color: {input_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
         border-radius: 4px !important;
-        padding: 2px 6px !important;
-        min-height: 24px !important;
-        height: 24px !important;
+        padding: 2px 8px !important;
+        min-height: 26px !important;
+        height: 26px !important;
         font-size: 11px !important;
-        line-height: 20px !important;
     }}
     div.stButton > button:hover {{
-        border-color: #00c076 !important;
-        color: #00c076 !important;
-    }}
-
-    /* 8. 팝오버(Popover) 다크 오버라이드 */
-    button[data-testid="stBaseButton-popover"],
-    div[data-testid="stPopover"] > button {{
-        background-color: {input_bg} !important;
-        color: {text_color} !important;
-        border: 1px solid {border_color} !important;
-        min-height: 24px !important;
-        height: 24px !important;
-        font-size: 11px !important;
-        padding: 0px 8px !important;
-        border-radius: 4px !important;
-    }}
-    div[data-testid="stPopoverBody"], div[data-baseweb="popover"] {{
-        background-color: {card_bg} !important;
-        color: {text_color} !important;
-        border: 1px solid {border_color} !important;
-        border-radius: 6px !important;
-    }}
-
-    /* 9. 🔥 [핵심] 호가창(Order Book) 위아래 간격 0px 극도 압축 스타일 */
-    div[data-testid="element-container"]:has(div[class*="ob-ask-"]),
-    div[data-testid="element-container"]:has(div[class*="ob-bid-"]) {{
-        margin: 0px !important;
-        padding: 0px !important;
-        height: 18px !important;
-    }}
-
-    div[class*="ob-ask-"], div[class*="ob-bid-"] {{
-        margin: 0px !important;
-        padding: 0px !important;
-        height: 18px !important;
-    }}
-
-    div[class*="ob-ask-"] > button, div[class*="ob-bid-"] > button {{
-        border: none !important;
-        border-radius: 0px !important;
-        padding: 0px 4px !important;
-        margin: 0px !important;
-        min-height: 18px !important;
-        height: 18px !important;
-        line-height: 18px !important;
-        font-size: 11px !important;
-        font-family: "Roboto Mono", "Courier New", monospace !important;
-        width: 100% !important;
-        white-space: pre !important;
-        text-align: left !important;
-        box-shadow: none !important;
-    }}
-
-    div[class*="ob-ask-"] > button {{
-        color: #ff4d4f !important;
-    }}
-    div[class*="ob-ask-"] > button:hover {{
-        outline: 1px solid #ff4d4f !important;
-        background-color: rgba(255, 77, 79, 0.35) !important;
-    }}
-
-    div[class*="ob-bid-"] > button {{
-        color: #00c076 !important;
-    }}
-    div[class*="ob-bid-"] > button:hover {{
-        outline: 1px solid #00c076 !important;
-        background-color: rgba(0, 192, 118, 0.35) !important;
-    }}
-
-    /* 10. 탭 헤더 다크 스타일 */
-    button[data-baseweb="tab"] {{
-        color: #848e9c !important;
-        background-color: transparent !important;
-    }}
-    button[aria-selected="true"] {{
-        color: #00c076 !important;
-        border-bottom-color: #00c076 !important;
+        border-color: #f0b90b !important;
+        color: #f0b90b !important;
     }}
 
     /* OKX Header Bar */
     .okx-header {{
-        background-color: {card_bg};
+        background-color: #131722;
         padding: 6px 14px;
-        border-radius: 8px;
+        border-radius: 4px;
         border: 1px solid {border_color};
-        margin-bottom: 6px;
+        margin-bottom: 8px;
     }}
-    .okx-price-up {{ color: #00c076; font-weight: bold; }}
-    .okx-price-down {{ color: #ff4d4f; font-weight: bold; }}
+    .okx-price-up {{ color: #26a69a; font-weight: bold; }}
+    .okx-price-down {{ color: #ef5350; font-weight: bold; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -269,54 +176,35 @@ try:
     btc_balance = balance['total'].get('BTC', 0)
     total_asset_usdt = usdt_balance + (btc_balance * current_price)
 
-    if st.session_state.limit_price_val == 0.0:
-        st.session_state.limit_price_val = current_price
-
 except Exception as e:
     st.error(f"거래소 데이터 로드 실패: {e}")
     st.stop()
 
-# --- 1. Top Header Bar & 내장 설정 창 ---
+# --- 1. Top Header Bar ---
 change_class = "okx-price-up" if change_24h >= 0 else "okx-price-down"
 change_sign = "+" if change_24h >= 0 else ""
 
-header_col, settings_col = st.columns([9.2, 0.8])
-
-with header_col:
-    st.markdown(f"""
-    <div class="okx-header">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="font-size: 15px; font-weight: bold;">⬛ {display_symbol}</span>
-                <span style="background-color: #2b313a; color: #f0b90b; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Demo Trading</span>
-                <span style="background-color: #1e232a; color: #848e9c; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Perp</span>
-            </div>
-            <div style="display: flex; gap: 14px; font-size: 11px;">
-                <div><span style="color: #848e9c;">최근가</span><br><span class="{change_class}" style="font-size: 13px;">${current_price:,.2f}</span></div>
-                <div><span style="color: #848e9c;">24h 변동률</span><br><span class="{change_class}">{change_sign}{change_24h:.2f}%</span></div>
-                <div><span style="color: #848e9c;">24h 고가</span><br><span>${high_24h:,.2f}</span></div>
-                <div><span style="color: #848e9c;">24h 저가</span><br><span>${low_24h:,.2f}</span></div>
-                <div><span style="color: #848e9c;">24h 거래량</span><br><span>{volume_24h:,.2f} BTC</span></div>
-                <div><span style="color: #848e9c;">총 평가 자산</span><br><span style="color: #f0b90b; font-weight: bold;">${total_asset_usdt:,.2f} USDT</span></div>
-            </div>
+st.markdown(f"""
+<div class="okx-header">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 15px; font-weight: bold;">⬛ {display_symbol}</span>
+            <span style="background-color: #2b313a; color: #f0b90b; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Demo Trading</span>
+            <span style="background-color: #1e232a; color: #848e9c; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Perp</span>
+        </div>
+        <div style="display: flex; gap: 14px; font-size: 11px;">
+            <div><span style="color: #848e9c;">최근가</span><br><span class="{change_class}" style="font-size: 13px;">${current_price:,.2f}</span></div>
+            <div><span style="color: #848e9c;">24h 변동률</span><br><span class="{change_class}">{change_sign}{change_24h:.2f}%</span></div>
+            <div><span style="color: #848e9c;">24h 고가</span><br><span>${high_24h:,.2f}</span></div>
+            <div><span style="color: #848e9c;">24h 저가</span><br><span>${low_24h:,.2f}</span></div>
+            <div><span style="color: #848e9c;">24h 거래량</span><br><span>{volume_24h:,.2f} BTC</span></div>
+            <div><span style="color: #848e9c;">총 평가 자산</span><br><span style="color: #f0b90b; font-weight: bold;">${total_asset_usdt:,.2f} USDT</span></div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
 
-with settings_col:
-    with st.popover("⚙️ 설정", use_container_width=True):
-        st.markdown("<div style='font-size: 12px; font-weight: bold; margin-bottom: 6px;'>🎨 화면 테마 선택</div>", unsafe_allow_html=True)
-        new_theme = st.radio(
-            "테마 선택",
-            ["Dark (다크 모드)", "Light (밝은 모드)"],
-            index=0 if "Dark" in st.session_state.theme_mode else 1,
-            label_visibility="collapsed"
-        )
-        if new_theme != st.session_state.theme_mode:
-            st.session_state.theme_mode = new_theme
-            st.rerun()
-
-# --- 2. 상단 슬림 타임프레임 컨트롤 바 ---
+# --- 2. 상단 타임프레임 컨트롤 바 ---
 tf_cols = st.columns([0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 1.2, 5])
 
 def set_timeframe(tf_code):
@@ -332,231 +220,111 @@ for idx, (label, code) in enumerate(primary_tfs):
             set_timeframe(code)
             st.rerun()
 
-with tf_cols[7]:
-    with st.popover("⌵ 더보기", use_container_width=True):
-        st.markdown("<div style='font-size:11px; margin-bottom:6px;'><b>⏱️ Intervals 선택</b></div>", unsafe_allow_html=True)
-        
-        grid_r1 = st.columns(5)
-        with grid_r1[0]:
-            if st.button("Line", key="pop_line"): set_timeframe("1m"); st.rerun()
-        with grid_r1[1]:
-            if st.button("1s", key="pop_1s"): set_timeframe("1s"); st.rerun()
-        with grid_r1[2]:
-            if st.button("1m", key="pop_1m"): set_timeframe("1m"); st.rerun()
-        with grid_r1[3]:
-            if st.button("3m", key="pop_3m"): set_timeframe("3m"); st.rerun()
-        with grid_r1[4]:
-            if st.button("5m", key="pop_5m"): set_timeframe("5m"); st.rerun()
+# --- 3. 메인 2컬럼 레이아웃 (좌: 와이드 차트 | 우: 주문 패널) ---
+chart_col, trade_col = st.columns([7.8, 2.2])
 
-        grid_r2 = st.columns(5)
-        with grid_r2[0]:
-            if st.button("15m", key="pop_15m"): set_timeframe("15m"); st.rerun()
-        with grid_r2[1]:
-            if st.button("30m", key="pop_30m"): set_timeframe("30m"); st.rerun()
-        with grid_r2[2]:
-            if st.button("1h", key="pop_1h"): set_timeframe("1h"); st.rerun()
-        with grid_r2[3]:
-            if st.button("2h", key="pop_2h"): set_timeframe("2h"); st.rerun()
-        with grid_r2[4]:
-            if st.button("4h", key="pop_4h"): set_timeframe("4h"); st.rerun()
-
-        grid_r3 = st.columns(5)
-        with grid_r3[0]:
-            if st.button("6h", key="pop_6h"): set_timeframe("6h"); st.rerun()
-        with grid_r3[1]:
-            if st.button("12h", key="pop_12h"): set_timeframe("12h"); st.rerun()
-        with grid_r3[2]:
-            if st.button("1D", key="pop_1d"): set_timeframe("1d"); st.rerun()
-        with grid_r3[3]:
-            if st.button("2D", key="pop_2d"): set_timeframe("2d"); st.rerun()
-        with grid_r3[4]:
-            if st.button("3D", key="pop_3d"): set_timeframe("3d"); st.rerun()
-
-        grid_r4 = st.columns(5)
-        with grid_r4[0]:
-            if st.button("5D", key="pop_5d"): set_timeframe("5d"); st.rerun()
-        with grid_r4[1]:
-            if st.button("1W", key="pop_1w"): set_timeframe("1w"); st.rerun()
-        with grid_r4[2]:
-            if st.button("1M", key="pop_1M"): set_timeframe("1M"); st.rerun()
-        with grid_r4[3]:
-            if st.button("3M", key="pop_3M"): set_timeframe("3M"); st.rerun()
-
-# --- 3. 메인 3컬럼 레이아웃 (차트 | 호가창 | 주문 패널) ---
-chart_col, orderbook_col, trade_col = st.columns([5.5, 2.2, 2.3])
-
-# --- [LEFT: OKX 차트 패널 카드] ---
+# --- [LEFT: 전문 트레이딩뷰 스타일 차트 패널] ---
 with chart_col:
     timeframe = st.session_state.active_tf
 
     try:
-        limit_cnt = 50 if timeframe in ['1s', '1m', '3m'] else 70
+        limit_cnt = 80
         ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, limit=limit_cnt)
     except Exception:
-        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='1m', limit=50)
+        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='5m', limit=80)
 
     df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
 
-    df['MA5'] = df['close'].rolling(window=5).mean()
-    df['MA10'] = df['close'].rolling(window=10).mean()
+    # 보조 지표 계산 (MA20, MA50, MA200, EMA20, 볼린저밴드)
     df['MA20'] = df['close'].rolling(window=20).mean()
+    df['MA50'] = df['close'].rolling(window=50).mean()
+    df['MA200'] = df['close'].rolling(window=200).mean()
+    df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
 
-    min_idx = df['low'].idxmin()
-    min_row = df.loc[min_idx]
+    std20 = df['close'].rolling(window=20).std()
+    df['BB_Upper'] = df['MA20'] + (std20 * 2)
+    df['BB_Lower'] = df['MA20'] - (std20 * 2)
 
     fig = make_subplots(
-        rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.02,
-        row_heights=[0.8, 0.2]
+        rows=1, cols=1, shared_xaxes=True
     )
 
+    # 1. 캔들스틱 차트 (TradingView 테마 색상 적용)
     fig.add_trace(go.Candlestick(
         x=df['datetime'], open=df['open'], high=df['high'],
-        low=df['low'], close=df['close'], name=display_symbol,
-        increasing_line_color='#00c076', increasing_fillcolor='#00c076',
-        decreasing_line_color='#ff4d4f', decreasing_fillcolor='#ff4d4f'
-    ), row=1, col=1)
+        low=df['low'], close=df['close'], name='BTC/USDT',
+        increasing_line_color='#26a69a', increasing_fillcolor='#26a69a',
+        decreasing_line_color='#ef5350', decreasing_fillcolor='#ef5350'
+    ))
 
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA5'], line=dict(color='#ff9900', width=1.2), name='MA(5)'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA10'], line=dict(color='#ff2a6d', width=1.2), name='MA(10)'), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20'], line=dict(color='#00e5ff', width=1.2), name='MA(20)'), row=1, col=1)
+    # 2. 이동평균선 & 이평선 추가
+    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20'], line=dict(color='#ff9800', width=1.5), name='MA20'))
+    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA50'], line=dict(color='#2196f3', width=1.5), name='MA50'))
+    fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA200'], line=dict(color='#9c27b0', width=1.5), name='MA200'))
+    fig.add_trace(go.Scatter(x=df['datetime'], y=df['EMA20'], line=dict(color='#00e676', width=1.5), name='EMA20'))
 
+    # 3. 볼린저 밴드
+    fig.add_trace(go.Scatter(x=df['datetime'], y=df['BB_Upper'], line=dict(color='#7e57c2', width=1, dash='dot'), name='BB Upper'))
+    fig.add_trace(go.Scatter(x=df['datetime'], y=df['BB_Lower'], line=dict(color='#7e57c2', width=1, dash='dot'), name='BB Lower'))
+
+    # 4. 현재가 점선 라인
     fig.add_hline(
-        y=current_price, row=1, col=1,
-        line_dash="dot", line_color="#00c076", line_width=1.2
+        y=current_price, line_dash="dash", line_color="#26a69a", line_width=1.2,
+        annotation_text=f" {current_price:,.1f}", annotation_position="right",
+        annotation_font=dict(color="#ffffff", size=11), annotation_bgcolor="#26a69a"
     )
 
-    fig.add_annotation(
-        x=min_row['datetime'], y=min_row['low'],
-        text=f"← {min_row['low']:,.2f}",
-        showarrow=False,
-        font=dict(size=11, color="#eaeaea"),
-        yshift=-12, xanchor="left",
-        row=1, col=1
-    )
-
-    colors = ['#00c076' if row['close'] >= row['open'] else '#ff4d4f' for _, row in df.iterrows()]
-    fig.add_trace(go.Bar(x=df['datetime'], y=df['volume'], marker_color=colors, name='Volume'), row=2, col=1)
-
+    # 🔥 [핵심] 마우스 휠 확대/축소 + Y축 드래그 확대/축소 활성화
     fig.update_layout(
-        paper_bgcolor=card_bg,
-        plot_bgcolor=card_bg,
-        font=dict(color="#848e9c", size=10),
-        height=470,
-        margin=dict(l=10, r=55, t=10, b=10),
+        paper_bgcolor='#000000',
+        plot_bgcolor='#000000',
+        font=dict(color="#b2b5be", size=11),
+        height=580,
+        margin=dict(l=10, r=60, t=25, b=20),
         xaxis_rangeslider_visible=False,
         showlegend=False,
-        hovermode="x unified"
+        hovermode="x unified",
+        
+        # 확대/축소 및 인터랙티브 인터페이스 설정
+        dragmode='pan',
+        
+        # Y축 금액 라벨 좌클릭 드래그 및 마우스 휠 줌 활성화
+        yaxis=dict(
+            side="right",
+            gridcolor="#1e222d",
+            zerolinecolor="#1e222d",
+            showgrid=True,
+            fixedrange=False # Y축 확대/축소 가능
+        ),
+        xaxis=dict(
+            gridcolor="#1e222d",
+            zerolinecolor="#1e222d",
+            showgrid=True,
+            fixedrange=False # X축 확대/축소 가능
+        )
     )
 
-    fig.update_yaxes(side="right", gridcolor="#1a1e24", zerolinecolor="#1a1e24", showgrid=True, row=1, col=1)
-    fig.update_yaxes(side="right", gridcolor="#1a1e24", zerolinecolor="#1a1e24", showgrid=True, row=2, col=1)
-    fig.update_xaxes(gridcolor="#1a1e24", zerolinecolor="#1a1e24", showgrid=True)
-
-    st.plotly_chart(fig, use_container_width=True)
-
-# --- [MIDDLE: 실시간 호가창 패널 카드 (초밀착 0px 갭 적용)] ---
-with orderbook_col:
-    st.markdown("<div style='font-weight: bold; font-size: 13px; margin-bottom: 4px; padding-bottom: 2px; border-bottom: 1px solid #282e38;'>📖 Order Book</div>", unsafe_allow_html=True)
-
-    asks = []
-    bids = []
-
-    try:
-        ob = exchange.fetch_order_book(ccxt_symbol, limit=8)
-        if ob and 'asks' in ob and 'bids' in ob and len(ob['asks']) > 0 and len(ob['bids']) > 0:
-            asks = [[float(x[0]), float(x[1])] for x in ob['asks'][:8] if len(x) >= 2]
-            bids = [[float(x[0]), float(x[1])] for x in ob['bids'][:8] if len(x) >= 2]
-    except Exception:
-        pass
-
-    if not asks or not bids:
-        step = 0.50
-        asks = [[current_price + (i * step), 0.0005 + (i * 0.002)] for i in range(8, 0, -1)]
-        bids = [[current_price - (i * step), 0.0005 + (i * 0.002)] for i in range(1, 9)]
-
-    st.markdown("""
-    <div style='font-size: 10px; color: #848e9c; font-family: monospace; display:flex; justify-content: space-between; padding: 1px 4px; border-bottom: 1px solid #1a1e24; margin-bottom: 2px;'>
-        <span>Price(USDT)</span>
-        <span>Amount(BTC)</span>
-        <span>Total(BTC)</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 매도 호가 (Asks - 8개)
-    cum_ask = 0
-    ask_rows = []
-    for p, a in reversed(asks):
-        cum_ask += a
-        ask_rows.append((p, a, cum_ask))
-
-    max_ask_cum = ask_rows[-1][2] if ask_rows else 1.0
-
-    for idx, (p, a, c) in enumerate(ask_rows):
-        pct = min(100.0, (c / max_ask_cum) * 100) if max_ask_cum > 0 else 0
-        bg_style = f"linear-gradient(90deg, rgba(255, 77, 79, 0.28) {pct:.1f}%, rgba(20, 12, 15, 0.8) {pct:.1f}%)" if is_dark else f"linear-gradient(90deg, rgba(255, 77, 79, 0.2) {pct:.1f}%, rgba(255, 235, 236, 0.8) {pct:.1f}%)"
-        
-        st.markdown(f"""
-        <style>
-            div.ob-ask-{idx} > button {{
-                background: {bg_style} !important;
-            }}
-        </style>
-        """, unsafe_allow_html=True)
-        
-        row_str = f"{p:,.2f}".ljust(11) + f"{a:.4f}".rjust(9) + f"{c:.4f}".rjust(10)
-        
-        st.markdown(f'<div class="ob-ask-{idx}">', unsafe_allow_html=True)
-        if st.button(row_str, key=f"ask_row_{idx}_{p:.2f}", use_container_width=True):
-            st.session_state.limit_price_val = float(p)
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # 현재가 라인 (컴팩트 바)
-    st.markdown(f"""
-    <div style='padding: 2px 6px; background-color: {input_bg}; border-radius: 3px; border: 1px solid {border_color}; margin: 2px 0; display:flex; align-items:center; justify-content:space-between;'>
-        <span class='{change_class}' style='font-size: 13px; font-weight: bold;'>${current_price:,.2f} {change_sign}</span>
-        <span style='font-size: 10px; color: #848e9c;'>⚡ Live</span>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # 매수 호가 (Bids - 8개)
-    cum_bid = 0
-    bid_rows = []
-    for p, a in bids:
-        cum_bid += a
-        bid_rows.append((p, a, cum_bid))
-
-    max_bid_cum = bid_rows[-1][2] if bid_rows else 1.0
-
-    for idx, (p, a, c) in enumerate(bid_rows):
-        pct = min(100.0, (c / max_bid_cum) * 100) if max_bid_cum > 0 else 0
-        bg_style = f"linear-gradient(90deg, rgba(0, 192, 118, 0.22) {pct:.1f}%, rgba(12, 22, 17, 0.8) {pct:.1f}%)" if is_dark else f"linear-gradient(90deg, rgba(0, 192, 118, 0.18) {pct:.1f}%, rgba(230, 250, 240, 0.8) {pct:.1f}%)"
-        
-        st.markdown(f"""
-        <style>
-            div.ob-bid-{idx} > button {{
-                background: {bg_style} !important;
-            }}
-        </style>
-        """, unsafe_allow_html=True)
-
-        row_str = f"{p:,.2f}".ljust(11) + f"{a:.4f}".rjust(9) + f"{c:.4f}".rjust(10)
-
-        st.markdown(f'<div class="ob-bid-{idx}">', unsafe_allow_html=True)
-        if st.button(row_str, key=f"bid_row_{idx}_{p:.2f}", use_container_width=True):
-            st.session_state.limit_price_val = float(p)
-            st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
+    # Streamlit 차트 옵션: 마우스 휠 줌 활성화 (scrollZoom = True)
+    st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config={
+            'scrollZoom': True,           # 휠로 차트 확대/축소
+            'displayModeBar': True,       # 상단 트레이딩 툴바 표시
+            'modeBarButtonsToRemove': ['select2d', 'lasso2d'],
+            'displaylogo': False
+        }
+    )
 
 # --- [RIGHT: 주문 패널 카드] ---
 with trade_col:
-    st.markdown("<div style='font-weight: bold; font-size: 13px; margin-bottom: 6px; padding-bottom: 2px; border-bottom: 1px solid #282e38;'>⚡ Trade Panel</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-weight: bold; font-size: 13px; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid #2a2e39;'>⚡ Trade Panel</div>", unsafe_allow_html=True)
     
     leverage = st.slider("🎯 레버리지 배율 (1x ~ 50x)", min_value=1, max_value=50, value=10, step=1)
     order_mode = st.radio("주문 타입", ["지정가 (Limit)", "시장가 (Market)"], horizontal=True)
     
-    limit_price = st.number_input("지정가 (USDT)", value=float(st.session_state.limit_price_val), step=10.0, key="limit_price_input")
+    limit_price = st.number_input("지정가 (USDT)", value=float(current_price), step=10.0, key="limit_price_input")
 
     trade_tab1, trade_tab2 = st.tabs(["🟢 Buy / Long", "🔴 Sell / Short"])
     
