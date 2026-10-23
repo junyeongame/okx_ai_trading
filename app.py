@@ -33,20 +33,28 @@ if "ai_result" not in st.session_state:
     st.session_state.ai_result = None
 
 # 지표 토글 세션 상태 초기화
-indicator_keys = ['show_ma20', 'show_ma50', 'show_ma200', 'show_ema20', 'show_bollinger', 'show_volume', 'show_rsi', 'show_macd']
-default_defaults = {'show_ma20': True, 'show_ma50': True, 'show_ma200': True, 'show_ema20': True, 'show_bollinger': True, 'show_volume': True, 'show_rsi': False, 'show_macd': False}
+default_defaults = {
+    'show_ma20': True,
+    'show_ma50': True,
+    'show_ma200': True,
+    'show_ema20': True,
+    'show_bollinger': True,
+    'show_volume': True,
+    'show_rsi': False,
+    'show_macd': False
+}
 
 for k, default_val in default_defaults.items():
     if k not in st.session_state:
         st.session_state[k] = default_val
 
-# 동적 CSS 테마 색상 설정
+# 동적 CSS 테마 색상 설정 (딥 다크 기본)
 is_dark = "Dark" in st.session_state.theme_mode
 
 bg_color = "#000000" if is_dark else "#ffffff"
-card_bg = "#0c0d10" if is_dark else "#f8f9fa"
-input_bg = "#161a22" if is_dark else "#f0f2f5"
-text_color = "#e6e8ea" if is_dark else "#111827"
+card_bg = "#08090c" if is_dark else "#f8f9fa"
+input_bg = "#131722" if is_dark else "#f0f2f5"
+text_color = "#d1d4dc" if is_dark else "#111827"
 border_color = "#2a2e39" if is_dark else "#d1d5db"
 grid_color = "#1e222d" if is_dark else "#e5e7eb"
 
@@ -57,31 +65,31 @@ st.markdown(f"""
         display: none !important;
     }}
     
-    /* 2. 전체 메인 앱 배경 및 기본 글자색 강제 적용 */
+    /* 2. 전체 메인 앱 배경 */
     .stApp, div[data-testid="stHeader"], div[data-testid="stToolbar"] {{
         background-color: {bg_color} !important;
         color: {text_color} !important;
     }}
 
-    /* 3. 컬럼 레이아웃 간격 */
+    /* 3. 컬럼 레이아웃 간격 최적화 */
     div[data-testid="stHorizontalBlock"] {{
-        gap: 8px !important;
+        gap: 6px !important;
     }}
 
     /* 4. 영역 분리 카드 디자인 */
     div[data-testid="column"] > div {{
         background-color: {card_bg} !important;
         border: 1px solid {border_color} !important;
-        border-radius: 6px !important;
-        padding: 8px 12px !important;
+        border-radius: 4px !important;
+        padding: 6px 10px !important;
     }}
 
-    /* 5. 모든 텍스트 라벨 가독성 강제 적용 */
+    /* 5. 모든 텍스트 라벨 가독성 적용 */
     label, p, span, h1, h2, h3, h4, h5, h6, div[data-testid="stWidgetLabel"], div[data-testid="stMarkdownContainer"] {{
         color: {text_color} !important;
     }}
 
-    /* 6. 입력 상자 다크/라이트 글자색 안보임 수정 */
+    /* 6. 입력 상자 다크/라이트 글자색 적용 */
     div[data-baseweb="input"], 
     div[data-baseweb="input"] > div,
     div[data-baseweb="base-input"],
@@ -97,33 +105,44 @@ st.markdown(f"""
         background-color: {input_bg} !important;
     }}
 
-    /* 7. 일반 버튼 및 지표 토글 버튼 스타일 */
+    /* 7. 일반/꺼짐 버튼 기본 스타일 */
     div.stButton > button {{
         background-color: {input_bg} !important;
-        color: {text_color} !important;
-        border: 1px solid {border_color} !important;
-        border-radius: 4px !important;
-        padding: 2px 6px !important;
-        min-height: 26px !important;
-        height: 26px !important;
+        color: #848e9c !important;
+        border: 1px solid #2a2e39 !important;
+        border-radius: 3px !important;
+        padding: 1px 4px !important;
+        min-height: 24px !important;
+        height: 24px !important;
         font-size: 11px !important;
-    }}
-    div.stButton > button:hover {{
-        border-color: #f0b90b !important;
-        color: #f0b90b !important;
+        font-weight: 500 !important;
     }}
 
-    /* 8. 팝오버 메뉴 다크/라이트 스타일 */
+    /* 🔥 [핵심] ON (활성화) 상태의 Primary 버튼 - 골드/노랑 불빛 강조 스타일 */
+    div.stButton > button[kind="primary"] {{
+        background-color: #f0b90b !important;
+        color: #000000 !important;
+        border: 1px solid #f0b90b !important;
+        font-weight: bold !important;
+        box-shadow: 0 0 6px rgba(240, 185, 11, 0.6) !important;
+    }}
+
+    div.stButton > button:hover {{
+        border-color: #f0b90b !important;
+        color: #ffffff !important;
+    }}
+
+    /* 8. 팝오버 메뉴 스타일 */
     button[data-testid="stBaseButton-popover"],
     div[data-testid="stPopover"] > button {{
         background-color: {input_bg} !important;
         color: {text_color} !important;
         border: 1px solid {border_color} !important;
-        min-height: 26px !important;
-        height: 26px !important;
+        min-height: 24px !important;
+        height: 24px !important;
         font-size: 11px !important;
-        padding: 0px 8px !important;
-        border-radius: 4px !important;
+        padding: 0px 6px !important;
+        border-radius: 3px !important;
     }}
     div[data-testid="stPopoverBody"], div[data-baseweb="popover"] {{
         background-color: {card_bg} !important;
@@ -136,9 +155,9 @@ st.markdown(f"""
     .okx-header {{
         background-color: {input_bg};
         padding: 6px 14px;
-        border-radius: 6px;
+        border-radius: 4px;
         border: 1px solid {border_color};
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }}
     .okx-price-up {{ color: #26a69a; font-weight: bold; }}
     .okx-price-down {{ color: #ef5350; font-weight: bold; }}
@@ -255,8 +274,8 @@ with settings_col:
             st.session_state.theme_mode = new_theme
             st.rerun()
 
-# --- 2. 상단 타임프레임 및 지표 온/오프 토글 바 ---
-tf_cols = st.columns([0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.9, 0.6, 0.6, 0.7, 0.7, 0.7, 0.7, 0.6, 0.6])
+# --- 2. 상단 타임프레임 및 지표 불빛 토글 바 ---
+tf_cols = st.columns([0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.9, 0.65, 0.65, 0.7, 0.7, 0.7, 0.7, 0.65, 0.65])
 
 def set_timeframe(tf_code):
     st.session_state.active_tf = tf_code
@@ -294,7 +313,7 @@ with tf_cols[7]:
             if st.button("30m", key="pop_30m"): set_timeframe("30m"); st.rerun()
         with grid_r2[2]:
             if st.button("1h", key="pop_1h"): set_timeframe("1h"); st.rerun()
-        with grid_r2[3]:
+        with grid_r3[3]:
             if st.button("2h", key="pop_2h"): set_timeframe("2h"); st.rerun()
         with grid_r2[4]:
             if st.button("4h", key="pop_4h"): set_timeframe("4h"); st.rerun()
@@ -311,7 +330,7 @@ with tf_cols[7]:
         with grid_r3[4]:
             if st.button("3D", key="pop_3d"): set_timeframe("3d"); st.rerun()
 
-# --- 🔥 지표 토글 버튼 (이미지 동일 구현) ---
+# --- 🔥 지표 토글 버튼 (켜지면 골드/주황 불빛 들어옴) ---
 indicators = [
     ("MA20", "show_ma20", 8),
     ("MA50", "show_ma50", 9),
@@ -371,7 +390,7 @@ with chart_col:
     df['MACD_Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
     df['MACD_Hist'] = df['MACD'] - df['MACD_Signal']
 
-    # 서브차트 개수 계산 (메인 캔들 + 거래량/RSI/MACD 추가 여부)
+    # 서브차트 개수 계산
     rows_cnt = 1
     row_heights = [0.7]
 
