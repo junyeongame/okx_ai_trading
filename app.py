@@ -245,8 +245,68 @@ with nav_right:
         st.rerun()
 
 if st.session_state.app_view == "analysis":
-    st.title("🤖 AI 분석 차트실")
-    st.caption("차트 분석과 판단 근거는 이 화면에서 확인하고, 실제 주문은 ‘매매 화면’에서 진행하세요.")
+    st.markdown("""
+    <style>
+        .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {
+            background: #090a0d !important; color: #e7d7b1 !important;
+        }
+        [data-testid="stHorizontalBlock"] > [data-testid="column"] > div {
+            background: #17130e !important; border: 2px solid #9a7947 !important;
+            border-radius: 0 !important; box-shadow: 3px 3px 0 #050506;
+        }
+        [data-testid="stMarkdownContainer"], [data-testid="stWidgetLabel"], label,
+        h1, h2, h3, h4, p { color: #e7d7b1 !important; }
+        [data-testid="stButton"] > button {
+            background: #17130e !important; color: #f0c75e !important;
+            border: 2px solid #a98242 !important; border-radius: 0 !important;
+            font-family: 'Courier New', monospace !important; font-weight: 700 !important;
+            box-shadow: 2px 2px 0 #050506 !important;
+        }
+        [data-testid="stButton"] > button[kind="primary"] {
+            background: #e0b441 !important; color: #15110a !important;
+        }
+        .pixel-banner {
+            background: #08090d; border: 2px solid #bd984d; padding: 10px 14px;
+            margin: 4px 0 10px; font-family: 'Courier New', monospace;
+            box-shadow: 4px 4px 0 #030304; color: #f1ce70;
+        }
+        .pixel-floor {
+            background-color: #674f31;
+            background-image: linear-gradient(rgba(18,13,8,.24) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(18,13,8,.24) 1px, transparent 1px);
+            background-size: 18px 18px; border: 2px solid #b2935b;
+            padding: 10px; margin: 8px 0; box-shadow: inset 0 0 0 3px #382a1b;
+        }
+        .pixel-agent {
+            background: #3f301e; border: 2px solid #c2a16a; padding: 9px;
+            min-height: 100px; font-family: 'Courier New', monospace;
+            box-shadow: 3px 3px 0 #080808;
+        }
+        .pixel-console {
+            background: #111117; border: 2px solid #6f6048; padding: 9px;
+            min-height: 100px; font-family: 'Courier New', monospace;
+            box-shadow: 3px 3px 0 #080808;
+        }
+        .pixel-agent-title { color: #f0c75e; font-weight: bold; font-size: 13px; }
+        .pixel-agent-body { color: #ddd3bd; font-size: 11px; line-height: 1.45; }
+        .pixel-console { border-left: 4px solid #f0c75e; }
+        [data-testid="stPlotlyChart"] { border: 2px solid #a98242; box-shadow: 3px 3px 0 #050506; }
+    </style>
+    """, unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="pixel-banner">
+      <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+        <div><b>◆ BTC AI ANALYSIS ROOM</b><br><span style="color:#aaa080">AGENT FLOOR · TECHNICAL SIGNALS · LIVE MARKET</span></div>
+        <div style="text-align:right"><b style="font-size:20px">BTC/USDT&nbsp; ${current_price:,.2f}</b><br>
+          <span style="color:{'#35d07f' if change_24h >= 0 else '#ff6464'}">24H {change_24h:+.2f}%</span>
+          &nbsp; <span style="color:#7bd8b0">● DEMO MARKET</span>
+        </div>
+      </div>
+    </div>
+    <div style="color:#c6b58f;font:12px 'Courier New',monospace;margin:0 0 8px">
+      차트 분석과 판단 근거는 이 분석실에서 확인하고, 주문은 <b>매매 화면</b>에서 진행하세요.
+    </div>
+    """, unsafe_allow_html=True)
 
     analysis_tf_options = ["1m", "3m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d", "2d", "3d"]
     if st.session_state.active_tf not in analysis_tf_options:
@@ -354,27 +414,57 @@ if st.session_state.app_view == "analysis":
             col=1,
         )
         analysis_fig.update_layout(
-            paper_bgcolor=card_bg,
-            plot_bgcolor=card_bg,
-            font=dict(color=text_color, size=10),
-            height=690,
-            margin=dict(l=10, r=55, t=35, b=10),
+            paper_bgcolor="#11100d",
+            plot_bgcolor="#11100d",
+            font=dict(color="#e7d7b1", size=10, family="Courier New, monospace"),
+            height=640,
+            margin=dict(l=8, r=45, t=35, b=8),
             xaxis_rangeslider_visible=False,
             hovermode="x unified",
             legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="left", x=0),
         )
-        analysis_fig.update_yaxes(side="right", gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True)
-        analysis_fig.update_xaxes(gridcolor=grid_color, zerolinecolor=grid_color, showgrid=True)
-        st.plotly_chart(analysis_fig, use_container_width=True, config={"scrollZoom": True, "displaylogo": False})
-
+        analysis_fig.update_yaxes(side="right", gridcolor="#403725", zerolinecolor="#403725", showgrid=True)
+        analysis_fig.update_xaxes(gridcolor="#403725", zerolinecolor="#403725", showgrid=True)
         latest = analysis_df.iloc[-1]
+        chart_room_col, console_room_col = st.columns([3.25, 1])
+        with chart_room_col:
+            st.plotly_chart(analysis_fig, use_container_width=True, config={"scrollZoom": True, "displaylogo": False})
+        with console_room_col:
+            rsi_console = f"{float(latest['RSI']):.1f}" if pd.notna(latest["RSI"]) else "N/A"
+            macd_state = "BULLISH / MACD ABOVE SIGNAL" if pd.notna(latest["MACD"]) and pd.notna(latest["MACD_Signal"]) and latest["MACD"] >= latest["MACD_Signal"] else "CAUTION / MACD BELOW SIGNAL"
+            st.markdown(f"""
+            <div class="pixel-console">
+              <div style="color:#f0c75e;font-weight:bold;font-size:13px">◆ AGENT CONSOLE</div>
+              <hr style="border-color:#4c412e">
+              <div class="pixel-agent-body"><b>STATUS</b> · MARKET LINKED<br>
+              <b>PAIR</b> · BTC/USDT<br><b>TF</b> · {analysis_tf}<br>
+              <b>RSI</b> · {rsi_console}<br><b>MACD</b> · {macd_state}</div>
+              <hr style="border-color:#4c412e">
+              <div style="color:#8fe0ac;font-size:11px">▶ 분석 대기 중<br>AI 버튼을 눌러 판단 논리를 생성하세요.</div>
+            </div>
+            """, unsafe_allow_html=True)
         metric_cols = st.columns(4)
         metric_cols[0].metric("최근가", f"${float(latest['close']):,.2f}")
         metric_cols[1].metric("RSI(14)", f"{float(latest['RSI']):.1f}" if pd.notna(latest["RSI"]) else "계산 중")
         metric_cols[2].metric("MACD", f"{float(latest['MACD']):.2f}" if pd.notna(latest["MACD"]) else "계산 중")
         metric_cols[3].metric("타임프레임", analysis_tf)
 
-        if st.button("🔍 이 차트 AI 분석하기", type="primary", use_container_width=True, key="run_room_analysis"):
+        ma20_status = "가격이 20주기선 위" if pd.notna(latest["MA20"]) and latest["close"] >= latest["MA20"] else "가격이 20주기선 아래"
+        rsi_status = "과매수 주의" if pd.notna(latest["RSI"]) and latest["RSI"] >= 70 else "과매도 주의" if pd.notna(latest["RSI"]) and latest["RSI"] <= 30 else "중립 모멘텀"
+        macd_status = "MACD 우위" if pd.notna(latest["MACD"]) and pd.notna(latest["MACD_Signal"]) and latest["MACD"] >= latest["MACD_Signal"] else "시그널 우위"
+        st.markdown('<div class="pixel-floor"><b style="color:#ffe08a;font-family:Courier New,monospace">◆ ANALYST FLOOR · 기술 지표 담당 에이전트</b></div>', unsafe_allow_html=True)
+        floor_cols = st.columns([1, 1, 1, 1.15])
+        floor_cards = [
+            ("🧭 TARO · TREND", ma20_status + f"<br>MA20 {float(latest['MA20']):,.2f}" if pd.notna(latest["MA20"]) else "MA20 데이터 대기"),
+            ("📈 DIANA · MOMENTUM", rsi_status + (f"<br>RSI {float(latest['RSI']):.1f}" if pd.notna(latest["RSI"]) else "")),
+            ("⚡ BULL · MACD", macd_status + (f"<br>MACD {float(latest['MACD']):.2f}" if pd.notna(latest["MACD"]) else "")),
+            ("🛡️ RISKY · RISK", "변동성과 거래량을 함께 확인<br>단일 지표로 매매 결정 금지"),
+        ]
+        for floor_col, (agent_name, agent_text) in zip(floor_cols, floor_cards):
+            with floor_col:
+                st.markdown(f'<div class="pixel-agent"><div class="pixel-agent-title">{agent_name}</div><div class="pixel-agent-body">{agent_text}</div></div>', unsafe_allow_html=True)
+
+        if st.button("▶ AI 에이전트 분석 시작", type="primary", use_container_width=True, key="run_room_analysis"):
             with st.status("🤖 분석 차트실에서 시장 데이터를 분석 중입니다...", expanded=True) as status:
                 try:
                     last_candles = [
@@ -473,6 +563,7 @@ if st.session_state.app_view == "analysis":
                 st.caption(f"분석 당시 타임프레임: {st.session_state.ai_result_timeframe}")
             st.markdown(f"**AI 판단 근거**\n\n{reason}")
 
+            st.markdown('<div class="pixel-banner"><b>◆ AI AGENT CONSOLE · 판단 결과 기록 완료</b></div>', unsafe_allow_html=True)
             st.markdown("#### 지표를 읽는 기준")
             logic_lines = []
             close_value = float(latest["close"])
@@ -602,9 +693,9 @@ with tf_cols[7]:
 
 # --- 🔥 지표 토글 버튼 (켜지면 골드/주황 불빛 들어옴) ---
 indicators = [
-    ("MA20", "show_ma20", 8),
-    ("MA50", "show_ma50", 9),
-    ("MA200", "show_ma200", 10),
+    ("20일선", "show_ma20", 8),
+    ("50일선", "show_ma50", 9),
+    ("200일선", "show_ma200", 10),
     ("EMA20", "show_ema20", 11),
     ("볼린저", "show_bollinger", 12),
     ("거래량", "show_volume", 13),
@@ -641,6 +732,20 @@ with chart_col:
     df['MA50'] = df['close'].rolling(window=50).mean()
     df['MA200'] = df['close'].rolling(window=200).mean()
     df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
+
+    # 선택한 차트 주기와 별개로 실제 일봉 기준 20/50/200일 이동평균선을 계산
+    try:
+        daily_ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe="1d", limit=250)
+        daily_df = pd.DataFrame(daily_ohlcv, columns=["timestamp", "open", "high", "low", "close", "volume"])
+        daily_df["day"] = pd.to_datetime(daily_df["timestamp"], unit="ms").dt.date
+        for period in (20, 50, 200):
+            daily_col = f"MA{period}D"
+            daily_df[daily_col] = daily_df["close"].rolling(window=period).mean()
+            daily_values = daily_df.set_index("day")[daily_col]
+            df[daily_col] = df["datetime"].dt.date.map(daily_values)
+    except Exception:
+        for period in (20, 50, 200):
+            df[f"MA{period}D"] = float("nan")
 
     std20 = df['close'].rolling(window=20).std()
     df['BB_Upper'] = df['MA20'] + (std20 * 2)
@@ -689,11 +794,11 @@ with chart_col:
 
     # 지표 온/오프 반영
     if st.session_state.show_ma20:
-        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20'], line=dict(color='#ff9800', width=1.5), name='MA20'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA20D'], line=dict(color='#ff9800', width=1.7), name='20일선'), row=1, col=1)
     if st.session_state.show_ma50:
-        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA50'], line=dict(color='#2196f3', width=1.5), name='MA50'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA50D'], line=dict(color='#2196f3', width=1.7), name='50일선'), row=1, col=1)
     if st.session_state.show_ma200:
-        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA200'], line=dict(color='#9c27b0', width=1.5), name='MA200'), row=1, col=1)
+        fig.add_trace(go.Scatter(x=df['datetime'], y=df['MA200D'], line=dict(color='#9c27b0', width=1.7), name='200일선'), row=1, col=1)
     if st.session_state.show_ema20:
         fig.add_trace(go.Scatter(x=df['datetime'], y=df['EMA20'], line=dict(color='#00e676', width=1.5), name='EMA20'), row=1, col=1)
     if st.session_state.show_bollinger:
@@ -751,6 +856,7 @@ with chart_col:
             'displaylogo': False
         }
     )
+    st.caption("20일선·50일선·200일선은 실제 1일봉 기준 이동평균입니다. EMA20은 선택한 차트 주기 기준입니다.")
 
 # --- [RIGHT: 주문 패널 카드] ---
 with trade_col:
