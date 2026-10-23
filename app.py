@@ -24,8 +24,9 @@ if "theme_mode" not in st.session_state:
 if "active_tf" not in st.session_state:
     st.session_state.active_tf = "5m"
 
+# ★ 기본 화면을 차트 분석실("office")로 설정
 if "app_view" not in st.session_state:
-    st.session_state.app_view = "trade"  # "trade" 또는 "office"
+    st.session_state.app_view = "office"  # "office" (차트 분석실) 또는 "trade" (매매 화면)
 
 # 지표 토글 세션 상태 초기화
 default_defaults = {
@@ -123,17 +124,6 @@ st.markdown(f"""
     .okx-price-down {{ color: #ef5350; font-weight: bold; }}
 
     /* 🎮 픽셀/도트 테마 오피스 전용 CSS */
-    .pixel-floor-container {{
-        background-color: #3d2b1f;
-        background-image: linear-gradient(rgba(0,0,0,0.3) 1px, transparent 1px),
-                          linear-gradient(90deg, rgba(0,0,0,0.3) 1px, transparent 1px);
-        background-size: 20px 20px;
-        border: 3px solid #8b6b47;
-        border-radius: 6px;
-        padding: 12px;
-        margin-top: 10px;
-    }}
-
     .pixel-card {{
         background-color: #241a14;
         border: 2px solid #5c432d;
@@ -152,16 +142,6 @@ st.markdown(f"""
         padding: 2px 4px;
         margin-bottom: 6px;
         font-size: 11px;
-    }}
-
-    .agent-avatar {{
-        display: inline-block;
-        width: 18px;
-        height: 18px;
-        background-color: #f0b90b;
-        border-radius: 2px;
-        margin-right: 4px;
-        vertical-align: middle;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -231,11 +211,11 @@ except Exception as e:
     st.error(f"거래소 데이터 로드 실패: {e}")
     st.stop()
 
-# --- 1. Top Header Bar & 우측 상단 화면 전환 (투자 분석실 / 매매 화면) ---
+# --- 1. Top Header Bar & 우측 상단 화면 전환 버튼 (차트분석실 / 매매화면) ---
 change_class = "okx-price-up" if change_24h >= 0 else "okx-price-down"
 change_sign = "+" if change_24h >= 0 else ""
 
-header_col, nav_col = st.columns([8.2, 1.8])
+header_col, btn_office_col, btn_trade_col = st.columns([7.6, 1.2, 1.2])
 
 with header_col:
     st.markdown(f"""
@@ -246,29 +226,32 @@ with header_col:
                 <span style="background-color: #2b313a; color: #f0b90b; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Demo Trading</span>
                 <span style="background-color: #1e232a; color: #848e9c; font-size: 10px; padding: 1px 4px; border-radius: 3px;">Perp</span>
             </div>
-            <div style="display: flex; gap: 14px; font-size: 11px;">
-                <div><span style="color: #848e9c;">최근가</span><br><span class="{change_class}" style="font-size: 13px;">${current_price:,.2f}</span></div>
-                <div><span style="color: #848e9c;">24h 변동률</span><br><span class="{change_class}">{change_sign}{change_24h:.2f}%</span></div>
-                <div><span style="color: #848e9c;">24h 고가</span><br><span>${high_24h:,.2f}</span></div>
-                <div><span style="color: #848e9c;">24h 저가</span><br><span>${low_24h:,.2f}</span></div>
-                <div><span style="color: #848e9c;">24h 거래량</span><br><span>{volume_24h:,.2f} BTC</span></div>
-                <div><span style="color: #848e9c;">총 평가 자산</span><br><span style="color: #f0b90b; font-weight: bold;">${total_asset_usdt:,.2f} USDT</span></div>
+            <div style="display: flex; gap: 12px; font-size: 11px;">
+                <div><span style="color: #848e9c;">최근가</span> <span class="{change_class}">${current_price:,.2f}</span></div>
+                <div><span style="color: #848e9c;">24h 변동률</span> <span class="{change_class}">{change_sign}{change_24h:.2f}%</span></div>
+                <div><span style="color: #848e9c;">총 자산</span> <span style="color: #f0b90b; font-weight: bold;">${total_asset_usdt:,.2f}</span></div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-with nav_col:
-    is_office = (st.session_state.app_view == "office")
-    btn_label = "📈 매매 화면으로 이동" if is_office else "🏢 투자 분석실 이동"
-    btn_kind = "primary" if is_office else "secondary"
-    
-    if st.button(btn_label, key="toggle_app_view", type=btn_kind, use_container_width=True):
-        st.session_state.app_view = "trade" if is_office else "office"
+# 상단 작은 2개 화면 전환 버튼
+is_office = (st.session_state.app_view == "office")
+
+with btn_office_col:
+    office_btn_kind = "primary" if is_office else "secondary"
+    if st.button("🤖 차트분석실", key="nav_office_btn", type=office_btn_kind, use_container_width=True):
+        st.session_state.app_view = "office"
+        st.rerun()
+
+with btn_trade_col:
+    trade_btn_kind = "secondary" if is_office else "primary"
+    if st.button("📈 매매화면", key="nav_trade_btn", type=trade_btn_kind, use_container_width=True):
+        st.session_state.app_view = "trade"
         st.rerun()
 
 # ==============================================================================
-# VIEW 1: [🏢 AI 투자 분석실 화면 (사무실 테마)]
+# VIEW 1: [🤖 AI 차트 분석실 화면 (기본 활성화)]
 # ==============================================================================
 if st.session_state.app_view == "office":
     # 1. 상단 타임프레임 컨트롤
@@ -293,7 +276,6 @@ if st.session_state.app_view == "office":
 
     df['MA20'] = df['close'].rolling(window=20).mean()
     df['MA50'] = df['close'].rolling(window=50).mean()
-    df['EMA20'] = df['close'].ewm(span=20, adjust=False).mean()
     std20 = df['close'].rolling(window=20).std()
     df['BB_Upper'] = df['MA20'] + (std20 * 2)
     df['BB_Lower'] = df['MA20'] - (std20 * 2)
@@ -391,7 +373,7 @@ if st.session_state.app_view == "office":
     st.stop()
 
 # ==============================================================================
-# VIEW 2: [📈 매매 화면 (기존 매매 트레이딩 패널)]
+# VIEW 2: [📈 매매 화면 (주문 패널 및 차트)]
 # ==============================================================================
 
 # --- 2. 상단 타임프레임 및 지표 온/오프 토글 바 ---
