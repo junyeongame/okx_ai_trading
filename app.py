@@ -26,9 +26,6 @@ if "theme_mode" not in st.session_state:
 if "active_tf" not in st.session_state:
     st.session_state.active_tf = "1h"
 
-if "candle_count" not in st.session_state:
-    st.session_state.candle_count = 100
-
 # 기본 화면: "office" (차트 분석실)
 if "app_view" not in st.session_state:
     st.session_state.app_view = "office"
@@ -265,22 +262,26 @@ with btn_trade_col:
 # VIEW 1: [🤖 AI 차트 분석실 화면]
 # ==============================================================================
 if st.session_state.app_view == "office":
-    # 1. 상단 타임프레임 및 과거 봉 개수 옵션
-    ctrl_col1, ctrl_col2, ctrl_col3 = st.columns([2, 3, 5])
-    with ctrl_col1:
-        selected_tf = st.selectbox("⏱️ 타임프레임(봉)", ["15m", "1h", "4h", "1d"], index=1, key="office_tf_select")
-        st.session_state.active_tf = selected_tf
-    with ctrl_col2:
-        selected_count = st.slider("📊 과거 봉 개수 불러오기", min_value=30, max_value=300, value=100, step=10, key="office_count_select")
-        st.session_state.candle_count = selected_count
+    # 1. 타임프레임 선택 바
+    tf_cols = st.columns([0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 11])
+    primary_tfs = [("1s", "1s"), ("1m", "1m"), ("5m", "5m"), ("15m", "15m"), ("1h", "1h"), ("4h", "4h"), ("1D", "1d")]
+    for idx, (label, code) in enumerate(primary_tfs):
+        with tf_cols[idx]:
+            is_active = (st.session_state.active_tf == code)
+            b_type = "primary" if is_active else "secondary"
+            if st.button(label, key=f"btn_office_tf_{code}", type=b_type, use_container_width=True):
+                st.session_state.active_tf = code
+                st.rerun()
 
     timeframe = st.session_state.active_tf
-    limit_cnt = st.session_state.candle_count
+    
+    # ★ 사용자가 봉 개수를 선택하지 않고, OKX에서 불러올 수 있는 과거 봉 데이터 전체(기본 300개)를 자동 수집
+    MAX_HISTORICAL_LIMIT = 300 
 
     try:
-        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, limit=limit_cnt)
+        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, limit=MAX_HISTORICAL_LIMIT)
     except Exception:
-        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='1h', limit=100)
+        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='1h', limit=MAX_HISTORICAL_LIMIT)
 
     df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
@@ -291,7 +292,7 @@ if st.session_state.app_view == "office":
     df['BB_Upper'] = df['MA20'] + (std20 * 2)
     df['BB_Lower'] = df['MA20'] - (std20 * 2)
 
-    # 2. 분석실 상단 넓은 과거 차트
+    # 2. 과거 풀 데이터 차트 렌더링
     fig_office = make_subplots(rows=1, cols=1)
     fig_office.add_trace(go.Candlestick(
         x=df['datetime'], open=df['open'], high=df['high'],
@@ -307,7 +308,7 @@ if st.session_state.app_view == "office":
     fig_office.update_layout(
         paper_bgcolor=card_bg, plot_bgcolor=card_bg,
         font=dict(color=text_color, size=10),
-        height=320,
+        height=350,
         margin=dict(l=10, r=50, t=10, b=10),
         xaxis_rangeslider_visible=False,
         showlegend=False, hovermode="x unified", dragmode='pan'
@@ -317,10 +318,10 @@ if st.session_state.app_view == "office":
 
     st.plotly_chart(fig_office, use_container_width=True, config={'scrollZoom': True, 'displaylogo': False})
 
-    # 3. 과거 차트 기반 AI 분석 실행 버튼
-    if st.button(f"🔍 과거 {limit_cnt}개 봉 기반 AI 분석 실행하기", type="primary", use_container_width=True):
+    # 3. 과거 풀 차트 기반 AI 분석 실행 버튼
+    if st.button("🔍 전체 과거 차트 기반 AI 분석 실행하기", type="primary", use_container_width=True):
         if ai_client:
-            with st.spinner("AI가 불러온 과거 시세 흐름과 지지/저항 라인을 정밀 분석 중입니다..."):
+            with st.spinner("AI가 불러온 OKX 전체 과거 시세 데이터 흐름을 정밀 분석 중입니다..."):
                 try:
                     market_data = {
                         "symbol": ccxt_symbol,
@@ -328,18 +329,18 @@ if st.session_state.app_view == "office":
                         "usdt_balance": usdt_balance,
                         "btc_balance": btc_balance,
                         "timeframe": timeframe,
-                        "candle_count": limit_cnt,
-                        "lowest_price": min(df['low']),
-                        "highest_price": max(df['high']),
+                        "total_candles_analyzed": len(df),
+                        "period_lowest_price": min(df['low']),
+                        "period_highest_price": max(df['high']),
                         "recent_candles": [
                             {"open": c[1], "high": c[2], "low": c[3], "close": c[4], "volume": c[5]}
-                            for c in ohlcv[-20:]
+                            for c in ohlcv[-30:]
                         ]
                     }
 
                     prompt = f"""
                     당신은 암호화폐 전문 트레이더 AI입니다.
-                    전달된 과거 {limit_cnt}개의 시세 흐름 및 차트 데이터를 바탕으로 종합 분석 판단을 내리세요.
+                    전달된 OKX 전체 과거 시세 흐름 및 차트 데이터를 바탕으로 종합 분석 판단을 내리세요.
 
                     [시장 데이터]
                     {json.dumps(market_data, indent=2)}
@@ -348,7 +349,7 @@ if st.session_state.app_view == "office":
                     반드시 아래 JSON 양식으로만 응답해야 합니다.
                     {{
                         "decision": "buy" 또는 "sell" 또는 "hold",
-                        "reason": "과거 지지/저항 라인 및 흐름에 기반한 상세한 판단 이유",
+                        "reason": "과거 전체 지지/저항 라인 및 가격 패턴 흐름에 기반한 상세한 판단 이유",
                         "percentage": 10~100 사이의 권장 주문 비중 (hold인 경우 0)
                     }}
                     """
@@ -486,12 +487,11 @@ chart_col, trade_col = st.columns([7.8, 2.2])
 
 with chart_col:
     timeframe = st.session_state.active_tf
-    limit_cnt = st.session_state.get("candle_count", 100)
 
     try:
-        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, limit=limit_cnt)
+        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe=timeframe, limit=300)
     except Exception:
-        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='5m', limit=100)
+        ohlcv = exchange.fetch_ohlcv(ccxt_symbol, timeframe='5m', limit=300)
 
     df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
     df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
